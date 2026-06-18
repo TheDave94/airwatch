@@ -85,7 +85,10 @@ CONF_UPDATE_INTERVAL: Final = "update_interval"  # minutes
 # {source_key: {enabled: bool, ...}}.
 CONF_SOURCES: Final = "sources"
 CONF_ENABLED: Final = "enabled"
-CONF_STATION: Final = "station"  # Sensor.Community / Land Steiermark station ref
+CONF_STATION: Final = "station"  # Land Steiermark single-station ref
+# Explicit Sensor.Community station IDs (list[int]); empty → auto-discover by
+# distance. Plural — distinct from CONF_STATION (Land Steiermark, singular).
+CONF_STATIONS: Final = "stations"
 # Max distance (km) to accept a Sensor.Community nearest-sensor match.
 CONF_MAX_DISTANCE_KM: Final = "max_distance_km"
 DEFAULT_MAX_DISTANCE_KM: Final = 10.0
@@ -114,6 +117,7 @@ def new_sources_config() -> dict[str, dict[str, object]]:
         SOURCE_SENSOR_COMMUNITY: {
             CONF_ENABLED: False,
             CONF_MAX_DISTANCE_KM: DEFAULT_MAX_DISTANCE_KM,
+            CONF_STATIONS: [],
         },
         SOURCE_LAND_STEIERMARK: {CONF_ENABLED: False, CONF_STATION: ""},
     }

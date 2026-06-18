@@ -42,6 +42,7 @@ from .const import (
     CONF_SELECTED_POLLUTANTS,
     CONF_SOURCES,
     CONF_STATION,
+    CONF_STATIONS,
     CONF_UPDATE_INTERVAL,
     DEFAULT_MAX_DISTANCE_KM,
     DEFAULT_SELECTED_POLLUTANTS,
@@ -153,21 +154,33 @@ def build_coordinators(
 
     sc_cfg = sources_cfg.get(SOURCE_SENSOR_COMMUNITY, {})
     if sc_cfg.get(CONF_ENABLED):
-        from .sources.sensor_community import SensorCommunitySource
+        from .sources.sensor_community import (
+            SUPPORTED_POLLUTANTS as SC_POLLUTANTS,
+        )
+        from .sources.sensor_community import (
+            SensorCommunitySource,
+        )
 
-        sensor_community = SensorCommunitySource(
-            latitude,
-            longitude,
-            pollutants,
-            max_distance_km=sc_cfg.get(CONF_MAX_DISTANCE_KM, DEFAULT_MAX_DISTANCE_KM),
-        )
-        coordinators[SOURCE_SENSOR_COMMUNITY] = AirWatchSourceCoordinator(
-            hass,
-            entry,
-            sensor_community,
-            SOURCE_SENSOR_COMMUNITY,
-            SENSOR_COMMUNITY_UPDATE_INTERVAL_MIN,
-        )
+        # Sensor.Community is particulate-only; skip building it (and polling the
+        # API) when the user selected no PM pollutant — it would have nothing to
+        # contribute. A later reload picks it up if PM is added.
+        if set(pollutants) & set(SC_POLLUTANTS):
+            sensor_community = SensorCommunitySource(
+                latitude,
+                longitude,
+                pollutants,
+                stations=sc_cfg.get(CONF_STATIONS) or None,
+                max_distance_km=sc_cfg.get(
+                    CONF_MAX_DISTANCE_KM, DEFAULT_MAX_DISTANCE_KM
+                ),
+            )
+            coordinators[SOURCE_SENSOR_COMMUNITY] = AirWatchSourceCoordinator(
+                hass,
+                entry,
+                sensor_community,
+                SOURCE_SENSOR_COMMUNITY,
+                SENSOR_COMMUNITY_UPDATE_INTERVAL_MIN,
+            )
 
     # Land Steiermark: secondary daily-mean source, disabled-by-default until a
     # clean live feed exists (OPEN_QUESTIONS.md Q6).
