@@ -151,9 +151,11 @@ ATTR_STATION: Final = "station"
 # Provenance/threshold attributes (Q4 — expose, don't assert).
 ATTR_LEVEL: Final = "level"
 ATTR_LEVEL_LABEL: Final = "level_label"
-ATTR_BAND_AUTHORITY: Final = "band_authority"
-ATTR_BAND_AVERAGING: Final = "band_averaging_period"
-ATTR_EAQI_BAND: Final = "eaqi_band"
+# Provenance-tagged band assessments, keyed by authority (eaqi / who_2021 /
+# eu_limit), each carrying authority + value + averaging window. The authorities
+# are kept DISTINCT — never collapsed into one verdict. See
+# pollutant_registry.band_provenance.
+ATTR_BANDS: Final = "bands"
 # CO convenience conversion (Q3 — exposed as a tagged attribute, not the state).
 ATTR_CO_PPM: Final = "value_ppm"
 ATTR_CO_PPM_NOTE: Final = "ppm_conversion_note"

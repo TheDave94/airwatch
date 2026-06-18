@@ -174,6 +174,10 @@ class AirWatchConfigFlow(ConfigFlow, domain=DOMAIN):
                 ): _INTERVAL_SELECTOR,
             }
         )
+        # On an error re-render, re-seed the form with what the user submitted
+        # (location/pollutants/interval) instead of resetting to defaults.
+        if user_input is not None:
+            schema = self.add_suggested_values_to_schema(schema, user_input)
         return self.async_show_form(
             step_id="user", data_schema=schema, errors=errors
         )

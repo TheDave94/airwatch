@@ -27,16 +27,19 @@ Provenance notes
   fetch.  Source: open-meteo.com air-quality API docs; EEA AQI definition.
 - **WHO 2021** = the WHO global air quality guidelines (AQG), 2021
   (ISBN 978-92-4-003422-8). These are 24-hour / annual / 8-hour means; AirWatch
-  readings are hourly, so the averaging-period mismatch is carried on each band
-  and surfaced as the ``band_averaging_period`` attribute — a provenance caveat,
-  not a silent comparison.
+  readings are hourly, so the averaging-period mismatch is carried as the
+  ``averaging`` field on every band in :func:`band_provenance` (surfaced on each
+  sensor's ``bands`` attribute) — a provenance caveat, not a silent comparison.
+- **EU 2008/50/EC** legal limit/target values are a tagged overlay kept distinct
+  from WHO (:data:`_EU_LIMITS`). The **US EPA AQI** is a reserved authority, not
+  populated in v1 (see :class:`BandAuthority`).
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Final
+from typing import Any, Final
 
 
 class PollutantKind(StrEnum):
@@ -65,9 +68,14 @@ class BandAuthority(StrEnum):
     EEA_2023 = "eea_2023"
     #: WHO 2021 global air quality guidelines (health-strict). The health overlay.
     WHO_2021 = "who_2021"
-    #: EU ambient-air legal limit values (2008/50/EC + the 2024 revision).
+    #: EU ambient-air legal limit/target values (2008/50/EC; the 2024 revision
+    #: (EU) 2024/2881 tightens several toward WHO by 2030). Implemented as a
+    #: tagged alternate overlay — see :data:`_EU_LIMITS` / :func:`band_provenance`.
     EU_LIMIT = "eu_limit"
-    #: US EPA AQI / NAAQS breakpoints (familiar ramp). Documented alternate.
+    #: US EPA AQI / NAAQS breakpoints (familiar ramp). RESERVED, not populated in
+    #: v1: the US AQI needs per-pollutant unit conversion (gases to ppb/ppm) plus
+    #: the piecewise-linear AQI computation, and is US-centric for an EU/CAMS
+    #: integration. Kept here so the authority is nameable when implemented.
     US_EPA_AQI = "us_epa_aqi"
 
 
@@ -100,6 +108,29 @@ _EAQI_INDEX_BOUNDS: Final[tuple[float, float, float, float, float]] = (
     20, 40, 60, 80, 100,
 )
 
+#: Classic EEA / Open-Meteo EAQI averaging basis per pollutant. PM uses a 24-hour
+#: running mean; the gaseous pollutants use hourly values. (Open-Meteo
+#: air-quality API docs; EEA index definition.) ``european_aqi`` is the aggregate
+#: index, which has no single averaging window. Surfaced so an EAQI band carries
+#: authority + value + averaging window, the same provenance triad as WHO/EU.
+_EAQI_AVERAGING: Final[dict[str, str]] = {
+    "pm2_5": "24-hour",
+    "pm10": "24-hour",
+    "nitrogen_dioxide": "1-hour",
+    "ozone": "1-hour",
+    "sulphur_dioxide": "1-hour",
+    "european_aqi": "aggregate",
+}
+
+#: Caveat carried on every EAQI band: AirWatch uses the classic EEA / Open-Meteo
+#: breakpoints (so a derived band agrees with the ``european_aqi`` value on the
+#: same fetch); the EEA's 2023 revision is stricter (WHO-aligned) and is the
+#: tagged alternate :attr:`BandAuthority.EEA_2023`.
+EAQI_SCALE_NOTE: Final = (
+    "Classic EEA / Open-Meteo breakpoints; the EEA's 2023 revision is stricter "
+    "(BandAuthority.EEA_2023) and is carried as a tagged alternate."
+)
+
 
 # --- WHO 2021 guideline overlay -------------------------------------------
 @dataclass(frozen=True)
@@ -124,6 +155,50 @@ _WHO_2021: Final[dict[str, WhoGuideline]] = {
     "ozone": WhoGuideline(100, "8-hour"),
     "sulphur_dioxide": WhoGuideline(40, "24-hour"),
     "carbon_monoxide": WhoGuideline(4000, "24-hour"),
+}
+
+
+# --- EU legal limit / target values (tagged alternate overlay) ------------
+@dataclass(frozen=True)
+class EuLimit:
+    """An EU ambient-air limit/target value and its averaging period (µg/m³).
+
+    Carries the *in-force* EU 2008/50/EC value so the band reflects today's
+    legal threshold; ``note`` records the short-term exceedance allowance and,
+    where relevant, the 2024 revision (Directive (EU) 2024/2881) that tightens
+    several values toward WHO by 2030. Distinct from WHO (health guideline) and
+    EAQI (display scale) — the three authorities are never collapsed.
+    """
+
+    value: float
+    averaging: str
+    note: str | None = None
+
+
+#: EU limit/target values, one representative threshold per pollutant (the
+#: short-term value where one exists, as it is the most comparable to an hourly
+#: reading; the averaging window is carried explicitly). Sources: Directive
+#: 2008/50/EC Annexes XI–XIV; Directive (EU) 2024/2881.
+_EU_LIMITS: Final[dict[str, EuLimit]] = {
+    "pm2_5": EuLimit(
+        25, "annual",
+        "2008/50/EC limit; (EU) 2024/2881 tightens to 10 µg/m³ (annual) by 2030",
+    ),
+    "pm10": EuLimit(
+        50, "24-hour", "2008/50/EC limit; ≤35 exceedance days per year permitted",
+    ),
+    "nitrogen_dioxide": EuLimit(
+        200, "1-hour", "2008/50/EC limit; ≤18 exceedance hours per year permitted",
+    ),
+    "ozone": EuLimit(
+        120, "8-hour", "2008/50/EC target value (max daily 8-hour mean)",
+    ),
+    "sulphur_dioxide": EuLimit(
+        350, "1-hour", "2008/50/EC limit; ≤24 exceedance hours per year permitted",
+    ),
+    "carbon_monoxide": EuLimit(
+        10000, "8-hour", "2008/50/EC limit (10 mg/m³, max daily 8-hour mean)",
+    ),
 }
 
 
@@ -321,3 +396,51 @@ def who_assessment_for(pollutant: str, value: float | None) -> WhoAssessment | N
 def who_guideline_for(pollutant: str) -> WhoGuideline | None:
     """The WHO 2021 guideline for a pollutant, or ``None``."""
     return _WHO_2021.get(pollutant)
+
+
+def eu_guideline_for(pollutant: str) -> EuLimit | None:
+    """The EU limit/target value for a pollutant, or ``None``."""
+    return _EU_LIMITS.get(pollutant)
+
+
+def band_provenance(pollutant: str, value: float | None) -> dict[str, Any]:
+    """Provenance-tagged band assessments for a reading — authorities DISTINCT.
+
+    Returns a dict keyed by authority (``eaqi`` / ``who_2021`` / ``eu_limit``);
+    each entry carries **authority + value + averaging window** and is never
+    collapsed into a single verdict (OPEN_QUESTIONS.md Q4). Authorities that do
+    not apply to a pollutant are omitted — e.g. ``european_aqi`` has no WHO/EU
+    concentration guideline, and carbon_monoxide is absent from the EAQI but
+    carries WHO + EU bands. Every value compared here is an hourly reading; the
+    ``averaging`` field exposes each band's native window so the mismatch is
+    visible, not asserted away.
+    """
+    out: dict[str, Any] = {}
+    band = eaqi_band_for(pollutant, value)
+    if band is not None:
+        out["eaqi"] = {
+            "authority": BandAuthority.EAQI.value,
+            "band": eaqi_band_label(band),
+            "band_index": band,
+            "colour": eaqi_band_colour(band),
+            "averaging": _EAQI_AVERAGING.get(pollutant),
+            "scale_note": EAQI_SCALE_NOTE,
+        }
+    who = _WHO_2021.get(pollutant)
+    if who is not None and value is not None:
+        out["who_2021"] = {
+            "authority": BandAuthority.WHO_2021.value,
+            "value": who.value,
+            "averaging": who.averaging,
+            "exceeds": value >= who.value,
+        }
+    eu = _EU_LIMITS.get(pollutant)
+    if eu is not None and value is not None:
+        out["eu_limit"] = {
+            "authority": BandAuthority.EU_LIMIT.value,
+            "value": eu.value,
+            "averaging": eu.averaging,
+            "exceeds": value >= eu.value,
+            "note": eu.note,
+        }
+    return out

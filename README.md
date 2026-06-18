@@ -57,8 +57,17 @@ carried, each tagged:
 - **European Air Quality Index (EAQI)** — the display / colour scale (6 bands,
   Good → Extremely poor). AirWatch uses the *classic EEA / Open-Meteo*
   breakpoints so a pollutant's band agrees with the `european_aqi` value on the
-  same fetch; the EEA's stricter 2023 revision, EU legal limit values, and the
-  US EPA AQI are recorded as tagged alternates.
+  same fetch; the EEA's stricter 2023 revision is the tagged alternate.
+- **EU legal limit / target values** (Directive 2008/50/EC) — a tagged overlay
+  alongside WHO, kept **distinct** from it: a reading can exceed the WHO
+  guideline while remaining under the looser EU limit, and AirWatch shows both
+  rather than collapsing them into one verdict.
+
+Each raw sensor carries a `bands` attribute keyed by authority (`eaqi` /
+`who_2021` / `eu_limit`), every entry tagged with its **authority + value +
+averaging window**. (The US EPA AQI is a reserved authority — not populated in
+v1, as it needs per-pollutant ppb/ppm conversion and the piecewise AQI
+computation and is US-centric for an EU/CAMS integration.)
 
 ### Carbon monoxide units
 

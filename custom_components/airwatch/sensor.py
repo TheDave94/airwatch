@@ -39,11 +39,9 @@ from .analytics import (
     level_label as _level_label,
 )
 from .const import (
-    ATTR_BAND_AUTHORITY,
-    ATTR_BAND_AVERAGING,
+    ATTR_BANDS,
     ATTR_CO_PPM,
     ATTR_CO_PPM_NOTE,
-    ATTR_EAQI_BAND,
     ATTR_FORECAST,
     ATTR_GRID_SHIFT_KM,
     ATTR_LAST_UPDATED,
@@ -75,11 +73,8 @@ from .coordinator import (
 from .sources.pollutant_registry import (
     CANONICAL_POLLUTANTS,
     CO_PPM_NOTE,
-    BandAuthority,
+    band_provenance,
     co_ugm3_to_ppm,
-    eaqi_band_for,
-    eaqi_band_label,
-    who_assessment_for,
 )
 
 # Coordinator-driven entities with no per-entity writes — HA serialization
@@ -98,12 +93,6 @@ ATTR_HISTORY_STATUS = "history_status"
 ATTR_DAYS_OF_HISTORY = "days_of_history"
 # ... and the consensus sensor.
 ATTR_SOURCE_LEVELS = "source_levels"
-# WHO overlay attribute keys (Q4 — health overlay, not a verdict).
-ATTR_WHO_EXCEEDS = "who_exceeds"
-ATTR_WHO_GUIDELINE = "who_guideline"
-
-# The classic-EEA/Open-Meteo bands AirWatch derives are authored by the EAQI.
-_BAND_AUTHORITY = BandAuthority.EAQI.value
 
 
 def _pollutant_name(pollutant: str) -> str:
@@ -244,7 +233,10 @@ def _pollutant_from_suffix(suffix: str, configured: set[str]) -> str:
 
 
 def _forecast_attr(
-    times: list[str], values: list[float | None], today: str, max_days: int
+    times: list[str],
+    values: list[float | None],
+    current_time: str | None,
+    max_days: int,
 ) -> list[dict[str, Any]]:
     """The upcoming daily-peak forecast: per-day max for dates >= today.
 
@@ -252,7 +244,14 @@ def _forecast_attr(
     be the today-onward slice — not the earliest days. Peaks (not means) are the
     health-relevant exposure; the partially-null final day is dropped via
     max_days.
+
+    ``current_time`` anchors "today". If the source omits it (shouldn't happen
+    for an OK Open-Meteo result, but defensive), return an empty forecast rather
+    than silently emitting the oldest backfill days as if they were the forecast.
     """
+    if not current_time:
+        return []
+    today = current_time[:10]
     return [
         {"date": date, "value": peak}
         for date, peak in daily_peaks(times, values)
@@ -327,21 +326,20 @@ class AirWatchSensor(CoordinatorEntity[AirWatchSourceCoordinator], SensorEntity)
         if series is None:
             return None
         shift = result.coordinate_shift_km
-        today = (result.current_time or "")[:10]
         current = series.current
         # Normalised severity from the integration's own bucketing
         # (analytics.level_for_source — single source of truth for every
-        # downstream consumer). Band provenance is exposed, not asserted (Q4).
+        # downstream consumer). Band provenance is exposed, not asserted (Q4):
+        # ATTR_BANDS keys each authority (eaqi / who_2021 / eu_limit) distinctly,
+        # carrying authority + value + averaging window — never collapsed.
         lvl = level_for_source(self._source_key, self._pollutant, series)
-        band = eaqi_band_for(self._pollutant, current)
         attrs: dict[str, Any] = {
             ATTR_FORECAST: _forecast_attr(
-                result.times, series.values, today, FORECAST_DAYS
+                result.times, series.values, result.current_time, FORECAST_DAYS
             ),
             ATTR_LEVEL: lvl,
             ATTR_LEVEL_LABEL: _level_label(lvl),
-            ATTR_EAQI_BAND: eaqi_band_label(band),
-            ATTR_BAND_AUTHORITY: _BAND_AUTHORITY,
+            ATTR_BANDS: band_provenance(self._pollutant, current),
             ATTR_REQUESTED_LAT: result.requested_lat,
             ATTR_REQUESTED_LON: result.requested_lon,
             ATTR_SNAPPED_LAT: result.snapped_lat,
@@ -349,14 +347,6 @@ class AirWatchSensor(CoordinatorEntity[AirWatchSourceCoordinator], SensorEntity)
             ATTR_GRID_SHIFT_KM: round(shift, 2) if shift is not None else None,
             ATTR_LAST_UPDATED: result.generated_at,
         }
-        # WHO 2021 health overlay — surfaced WITH its averaging-period caveat
-        # (AirWatch readings are hourly; WHO values are 24-hour/8-hour/annual
-        # means). Skipped when no guideline exists (european_aqi).
-        who = who_assessment_for(self._pollutant, current)
-        if who is not None:
-            attrs[ATTR_WHO_EXCEEDS] = who.exceeds
-            attrs[ATTR_WHO_GUIDELINE] = who.guideline
-            attrs[ATTR_BAND_AVERAGING] = who.averaging
         # CO convenience: expose a tagged ppm value + its conversion note (Q3).
         # The state stays the native µg/m³; ppm is never the state.
         if self._pollutant == "carbon_monoxide":

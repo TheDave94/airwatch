@@ -11,9 +11,12 @@ import pytest
 
 from custom_components.airwatch.sources.pollutant_registry import (
     BandAuthority,
+    band_provenance,
     co_ugm3_to_ppm,
+    eaqi_band_colour,
     eaqi_band_for,
     eaqi_band_label,
+    eu_guideline_for,
     level_for_value,
     who_assessment_for,
     who_guideline_for,
@@ -164,3 +167,79 @@ def test_co_ugm3_to_ppm_conversion():
 def test_co_ugm3_to_ppm_none_and_zero():
     assert co_ugm3_to_ppm(None) is None
     assert co_ugm3_to_ppm(0) == 0.0
+
+
+# --- eaqi_band_colour ------------------------------------------------------
+
+
+def test_eaqi_band_colour():
+    assert eaqi_band_colour(1) == "#50f0e6"
+    assert eaqi_band_colour(6) == "#7d2181"
+    assert eaqi_band_colour(None) is None
+    assert eaqi_band_colour(0) is None  # out of range
+
+
+# --- eu_guideline_for ------------------------------------------------------
+
+
+def test_eu_guideline_for():
+    no2 = eu_guideline_for("nitrogen_dioxide")
+    assert no2 is not None
+    assert no2.value == 200
+    assert no2.averaging == "1-hour"
+    # CO EU limit is the 8-hour 10 mg/m³ value.
+    assert eu_guideline_for("carbon_monoxide").value == 10000
+    # european_aqi (an index) has no EU concentration limit.
+    assert eu_guideline_for("european_aqi") is None
+
+
+# --- band_provenance: authorities distinct, each carries value+averaging ----
+
+
+def test_band_provenance_concentration_pollutant_has_all_three_authorities():
+    # pm2_5 @ 30 µg/m³: in the EAQI, over WHO 24h (15), over EU annual (25).
+    prov = band_provenance("pm2_5", 30)
+    assert set(prov) == {"eaqi", "who_2021", "eu_limit"}
+    # each authority is tagged and carries its averaging window — not collapsed
+    assert prov["eaqi"]["authority"] == BandAuthority.EAQI.value
+    assert prov["eaqi"]["band"] == "poor"
+    assert prov["eaqi"]["averaging"] == "24-hour"
+    assert prov["eaqi"]["colour"] == "#ff5050"
+    assert prov["who_2021"]["authority"] == BandAuthority.WHO_2021.value
+    assert prov["who_2021"]["value"] == 15
+    assert prov["who_2021"]["averaging"] == "24-hour"
+    assert prov["who_2021"]["exceeds"] is True
+    assert prov["eu_limit"]["authority"] == BandAuthority.EU_LIMIT.value
+    assert prov["eu_limit"]["value"] == 25
+    assert prov["eu_limit"]["averaging"] == "annual"
+    assert prov["eu_limit"]["exceeds"] is True
+
+
+def test_band_provenance_who_and_eu_are_independent_not_collapsed():
+    # pm2_5 @ 20: over WHO (15) but under EU annual (25) — the two authorities
+    # must disagree, proving they are not collapsed into one verdict.
+    prov = band_provenance("pm2_5", 20)
+    assert prov["who_2021"]["exceeds"] is True
+    assert prov["eu_limit"]["exceeds"] is False
+
+
+def test_band_provenance_co_has_who_eu_but_no_eaqi():
+    # CO is absent from the EAQI but carries WHO + EU bands.
+    prov = band_provenance("carbon_monoxide", 5000)
+    assert "eaqi" not in prov
+    assert prov["who_2021"]["value"] == 4000
+    assert prov["who_2021"]["exceeds"] is True
+    assert prov["eu_limit"]["value"] == 10000
+    assert prov["eu_limit"]["exceeds"] is False  # 5000 < 10000
+
+
+def test_band_provenance_european_aqi_index_only():
+    # european_aqi is an index — EAQI band only, no WHO/EU concentration bands.
+    prov = band_provenance("european_aqi", 55)
+    assert set(prov) == {"eaqi"}
+    assert prov["eaqi"]["band"] == "moderate"
+    assert prov["eaqi"]["averaging"] == "aggregate"
+
+
+def test_band_provenance_none_value_is_empty():
+    assert band_provenance("pm2_5", None) == {}
