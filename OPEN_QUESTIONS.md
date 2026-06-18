@@ -1,24 +1,26 @@
-# AirWatch — open questions (resolve before real coding)
+# AirWatch — open questions
 
-These are decisions, not code. Each blocks part of the fresh-session build.
+> **ALL RESOLVED 2026-06-18** (fresh-session build). Decisions recorded inline
+> below; Q3 + Q4 were flagged to the maintainer and signed off explicitly.
 
-## Q1 — Repo name (BLOCKS: GitHub remote, manifest URLs, hacs.json)
-`airwatch` vs `ha-airwatch` vs other. PollenWatch uses the bare name
-(`TheDave94/pollenwatch`), so **`airwatch`** is the consistent default.
-- Local dir is `/opt/repos/airwatch` (provisional, cheap to rename).
-- **No GitHub remote created yet** — awaiting this decision. manifest.json +
-  hacs.json currently point at `github.com/TheDave94/airwatch` as a placeholder.
+These were decisions, not code. Each blocked part of the fresh-session build.
 
-## Q2 — Open-Meteo air-quality endpoint exact params (BLOCKS: open_meteo.py)
-Endpoint confirmed: `https://air-quality-api.open-meteo.com/v1/air-quality`.
-Decide the exact `hourly=` set + options:
-- Candidate `hourly`: `pm2_5,pm10,nitrogen_dioxide,ozone,sulphur_dioxide,carbon_monoxide,european_aqi`
-  (also available: `us_aqi`, `ammonia`, `dust`, `aerosol_optical_depth`, `uv_index`).
-- `domain=cams_europe` (vs global `cams_global`)? `past_days` (backfill for percentile),
-  `forecast_days`, `timezone`. Mirror PollenWatch's choices where sensible.
+## Q1 — Repo name — ✅ RESOLVED: `airwatch`
+Matches `TheDave94/pollenwatch` (bare name). Local dir `/opt/repos/airwatch`.
+GitHub remote `TheDave94/airwatch` (public) created this session; manifest.json +
+hacs.json URLs are correct as written.
 
-## Q3 — Pollutant → HA device_class + unit map (BLOCKS: sensor.py, pollutant_registry.py)
-Proposed (confirm units, esp. CO):
+## Q2 — Open-Meteo air-quality endpoint params — ✅ RESOLVED
+Endpoint: `https://air-quality-api.open-meteo.com/v1/air-quality`.
+- `hourly` (= `current` mirror): `pm2_5,pm10,nitrogen_dioxide,ozone,sulphur_dioxide,carbon_monoxide,european_aqi`
+  (literal Open-Meteo variable names — no `_pollen` suffix, unlike PollenWatch).
+- `domains=cams_europe` (global returns nulls for several species).
+- `past_days=92` (MAX_PAST_DAYS, feeds the self-baselined recent_percentile).
+- `forecast_days=5`, `timezone=auto`.
+Near-verbatim ADAPT of PollenWatch `OpenMeteoSource._params()`; only the variable
+set + the `_API_VAR` mapping change.
+
+## Q3 — Pollutant → device_class + unit map — ✅ RESOLVED (flagged + signed off)
 | pollutant | device_class | unit |
 |---|---|---|
 | PM2.5 | `pm25` | µg/m³ |
@@ -26,27 +28,38 @@ Proposed (confirm units, esp. CO):
 | NO₂ | `nitrogen_dioxide` | µg/m³ |
 | O₃ | `ozone` | µg/m³ |
 | SO₂ | `sulphur_dioxide` | µg/m³ |
-| CO | `carbon_monoxide` | **µg/m³ or mg/m³?** (Open-Meteo returns µg/m³; HA `carbon_monoxide` class expects ppm — decide convert vs unit override) |
+| CO | **(none)** | **µg/m³** |
 | European AQI | `aqi` | (index, no unit) |
 
-## Q4 — Primary threshold standard (BLOCKS: pollutant_registry.py bands, card)
-Which is the canonical band set, with the others as provenance-tagged alternates
-(reusing PollenWatch's threshold_status concept):
-- **WHO 2021 guidelines** (health-strict), **EU limit values** (legal), or
-  **US-AQI breakpoints** (familiar colour ramp)?
-- Recommendation to weigh: WHO as primary "health" bands + European AQI as the
-  display/colour scale, each tagged by authority. Decide before writing bands.
+**CO decision:** OMIT `device_class`, keep native **µg/m³** + `state_class=measurement`.
+Rationale: HA `carbon_monoxide` device_class accepts **ppm only** (`DEVICE_CLASS_UNITS`
+rejects µg/m³ → unit-mismatch warning); converting bakes in a T/P assumption and
+loses source fidelity. device_class is NOT required for long-term statistics
+(`state_class` alone suffices). Keeping µg/m³ also matches the WHO/EU
+mass-concentration band basis chosen in Q4. A converted ppm is exposed as a
+*provenance-tagged attribute* (assumption: 20 °C / 24.04 L·mol⁻¹ / MW 28.01 g/mol)
+for convenience only. The other 5 pollutants keep device_class + µg/m³ (match natively).
 
-## Q5 — Card framework (BLOCKS: frontend/airwatch-card.js)
-PollenWatch ships a vanilla-JS bundled card. Reuse that approach (no build step)
-vs Lit vs custom-button-card template? Default: **match PollenWatch (vanilla JS,
-bundled)** for consistency + zero build.
+## Q4 — Primary threshold standard — ✅ RESOLVED (flagged + signed off)
+**WHO 2021 air-quality guidelines = primary health bands; European AQI (EEA/EAQI)
+= display/colour scale.** Each band is **provenance-tagged** via a ported
+`ThresholdStatus`-analog enum (pollutant_registry) — every band cites
+**authority + value + averaging window**; **no invented numbers**. EU legal limit
+values (2008/50/EC + 2024 ambient-air directive) and US-EPA AQI breakpoints are
+carried as provenance-tagged **alternates**. The averaging-period mismatch (WHO
+bands are 24h / annual means; our readings are hourly) is **surfaced as part of
+provenance**, not silently ignored — the PollenWatch "expose provenance, don't
+assert a verdict" model.
 
-## Q6 — Land Steiermark access path (BLOCKS: land_steiermark.py — lowest priority)
-Daily-mean only; data.gv.at CKAN API is dead, live HMW is portal-only. Decide:
-scrape the portal map endpoint, use annual archive files, or **ship the source
-disabled-by-default** until a clean feed exists. Likely defer (secondary source).
+## Q5 — Card framework — ✅ RESOLVED: vanilla-JS bundled
+Match PollenWatch (vanilla JS, no build step) for consistency + zero build.
+AQI colour ramps per Q4 (EAQI scale).
 
-## Q7 — Region defaults (BLOCKS: region_defaults.py)
-Which pollutants to preselect per region/country on onboarding (vs select-all).
-Lower stakes; can default to "all CAMS pollutants on" for v1.
+## Q6 — Land Steiermark access — ✅ RESOLVED: ship disabled-by-default
+data.gv.at CKAN API is dead; live HMW is portal-only. Land Steiermark is a
+SECONDARY (daily-mean drift anchor). Land the source module but register it
+**disabled-by-default / opt-in** until a clean feed exists. Defer the feed work.
+
+## Q7 — Region defaults — ✅ RESOLVED: all CAMS pollutants on for v1
+`region_defaults.py` carries the per-region preselection table but does NOT gate
+v1; v1 onboarding defaults to **all CAMS pollutants enabled**.
