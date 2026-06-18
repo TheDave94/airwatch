@@ -1,2 +1,172 @@
-# AirWatch — HA quality-scale declaration.
-# TODO: port from pollenwatch/.../quality_scale.yaml; re-assess each rule for AirWatch.
+# Quality scale rules for AirWatch.
+#
+# Manifest claim: silver. This file documents each silver rule's status
+# (and the bronze rules silver depends on). Gold + Platinum are not claimed;
+# their rules are marked todo with one-line gap notes so the next-rung
+# work is enumerable rather than implicit.
+#
+# AirWatch is a rebuild (the data + analytics layer is a PollenWatch fork with
+# pollen → pollutant swapped). Rules are re-assessed against AirWatch's CURRENT
+# state, not inherited verbatim from PollenWatch — several PollenWatch "done"
+# rules are honestly "todo" here because the matching tests/docs are not yet
+# ported.
+#
+# See https://developers.home-assistant.io/docs/core/integration-quality-scale/
+
+rules:
+  # ------------------------- Bronze -------------------------
+  action-setup:
+    status: exempt
+    comment: |
+      No custom services registered. The integration exposes sensors and
+      binary_sensors driven by DataUpdateCoordinator polls; users automate
+      against state changes, not against integration-owned actions.
+  appropriate-polling: done
+  brands: todo
+  common-modules: done
+  config-flow: done
+  config-flow-test-coverage:
+    status: todo
+    comment: |
+      The config + options flow is implemented (config_flow.py), but the HA-based
+      config-flow test suite is not yet ported from PollenWatch. The current
+      test surface is the pure data/analytics layer (analytics, pollutant
+      registry, Open-Meteo parse). Tracked for the first silver tag.
+  dependency-transparency: done
+  docs-actions:
+    status: exempt
+    comment: No custom services to document.
+  docs-high-level-description: done
+  docs-installation-instructions:
+    status: todo
+    comment: README exists; the docs/ tree is empty pending the v1 docs pass.
+  docs-removal-instructions: todo
+  entity-event-setup: done
+  entity-unique-id: done
+  has-entity-name: done
+  runtime-data: done
+  test-before-configure: done
+  test-before-setup: done
+  unique-config-entry: done
+
+  # ------------------------- Silver -------------------------
+  action-exceptions:
+    status: exempt
+    comment: No custom services registered (see action-setup).
+  config-entry-unloading: done
+  docs-configuration-parameters: todo
+  docs-installation-parameters: todo
+  entity-unavailable: done
+  integration-owner: done
+  log-when-unavailable:
+    status: done
+    comment: |
+      Inherited via DataUpdateCoordinator: sources raise UpdateFailed inside
+      _async_update_data, the base class handles the once-on-disconnect /
+      once-on-reconnect logging pattern.
+  parallel-updates:
+    status: done
+    comment: |
+      sensor.py + binary_sensor.py declare PARALLEL_UPDATES = 0 at module
+      level (coordinator-driven; no per-entity writes).
+  reauthentication-flow:
+    status: exempt
+    comment: |
+      Every AirWatch source is KEYLESS — Open-Meteo (CAMS), Sensor.Community,
+      and Land Steiermark all poll free, unauthenticated endpoints. There is no
+      credential to revoke or rotate, so re-auth is not applicable. (Contrast
+      PollenWatch, which had two keyed sources and tracked this as a gap.) If a
+      keyed source is ever added, SourceAuthError already exists in
+      sources/base.py to drive a re-auth flow.
+  test-coverage:
+    status: todo
+    comment: |
+      The pure layer (analytics consensus/percentile, pollutant_registry bands,
+      Open-Meteo parse with injected transport) is unit-tested offline. The
+      HA-integration tests (init/setup, entity wiring, config-flow) are not yet
+      ported. Tracked for the first silver tag.
+
+  # ------------------------- Gold (not claimed) -------------------------
+  devices: done
+  diagnostics:
+    status: done
+    comment: |
+      diagnostics.py implements async_get_config_entry_diagnostics: entry
+      data + options with the location coordinates redacted, plus a per-source
+      last-fetch summary. (No API keys to redact — all sources are keyless.)
+  discovery:
+    status: exempt
+    comment: |
+      Cloud-polling integration with a user-configured location; nothing on
+      the local network to discover.
+  discovery-update-info:
+    status: exempt
+    comment: See `discovery`.
+  docs-data-update: todo
+  docs-examples: todo
+  docs-known-limitations: todo
+  docs-supported-devices:
+    status: exempt
+    comment: |
+      No physical devices supported; the "devices" in HA's registry are
+      logical per-source groupings of cloud-polled entities.
+  docs-supported-functions: todo
+  docs-troubleshooting: todo
+  docs-use-cases: todo
+  dynamic-devices:
+    status: exempt
+    comment: |
+      Per-source devices are created at config-entry setup from the user's
+      selected sources; there is no upstream notion of dynamic device
+      discovery for cloud air-quality feeds.
+  entity-category:
+    status: todo
+    comment: |
+      Derived sensors (recent_percentile, divergence) should carry
+      EntityCategory.DIAGNOSTIC so they collapse to the device's diagnostics
+      panel instead of the main entity list. Raw + consensus stay as primary.
+  entity-device-class:
+    status: done
+    comment: |
+      Concentration pollutants map to their HA device_class (pm25, pm10,
+      nitrogen_dioxide, ozone, sulphur_dioxide); european_aqi → aqi. CO omits
+      the device_class deliberately (HA's carbon_monoxide class accepts ppm
+      only; AirWatch keeps native µg/m³). See pollutant_registry.py.
+  entity-disabled-by-default:
+    status: exempt
+    comment: |
+      Every sensor created represents a user-selected (pollutant, source) pair;
+      the selection bounds the entity blowup. Nothing to disable by default.
+  entity-translations:
+    status: todo
+    comment: |
+      strings.json + en/de translations cover the pollutant + derived-sensor
+      names via translation_key. This rule passes once translators contribute
+      additional locales beyond en/de.
+  exception-translations: todo
+  icon-translations:
+    status: exempt
+    comment: |
+      Bundled Lovelace card carries the visual identity. Entities use
+      device-class default icons; an icon-translation step is not currently
+      load-bearing for the UX.
+  reconfiguration-flow: todo
+  repair-issues:
+    status: exempt
+    comment: |
+      User-visible degradations (out-of-coverage location, source unavailable)
+      are surfaced via the source's HA-native state (unavailable / coordinator
+      error) and the bundled card's honest states. A repair-issues flow would
+      duplicate that signalling without adding actionability.
+  stale-devices: done
+
+  # ------------------------- Platinum (not claimed) -------------------------
+  async-dependency:
+    status: done
+    comment: All sources use aiohttp via async_get_clientsession.
+  inject-websession:
+    status: done
+    comment: |
+      Every source's async_fetch accepts an aiohttp.ClientSession parameter;
+      production code passes HA's shared session via async_get_clientsession.
+  strict-typing: todo

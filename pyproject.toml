@@ -1,5 +1,20 @@
-# AirWatch — packaging + tooling (Ruff/pytest config). STUB.
-# TODO: port from pollenwatch/pyproject.toml; set name=airwatch, version managed by release-please.
 [project]
 name = "airwatch"
 version = "0.0.0"
+description = "Multi-source European air-quality aggregator for Home Assistant"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.12"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"

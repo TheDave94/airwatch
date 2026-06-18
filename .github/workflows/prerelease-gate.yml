@@ -1,3 +1,62 @@
-# AirWatch CI — Tier-1 discovery smoke test (on release: prereleased).
-# STUB. TODO: port from pollenwatch/.github/workflows/prerelease-gate.yml.
-# Adapt: throwaway-HA target, WS endpoint name (airwatch/config).
+name: Tier 1 prerelease gate
+
+# Runs the discovery smoke-test suite against the throwaway HA whenever a
+# GitHub prerelease is published. Blocking on assertion failure, tolerant of
+# infra: if the test can't reach HA / auth / handshake, pytest skips and the
+# job exits 0 ("inconclusive"). If the WS contract is actually broken, asserts
+# fail and the job exits non-zero — blocking the release promotion.
+#
+# SELF-HOSTED RUNNER REQUIRED. This job runs on the VM that hosts the
+# throwaway HA. The runner must be registered with the label
+# `airwatch-throwaway` so this `runs-on` matches. Registration steps:
+# see docs/PRERELEASE_GATE.md (David's setup, one-time).
+#
+# Runtime target (throwaway HA host/port) is TBD — AirWatch does not yet have a
+# dedicated throwaway box. Do NOT point this at PollenWatch's protected :8124.
+# The HA_URL below is a placeholder; fill it in once the AirWatch throwaway
+# exists.
+#
+# Token: prefers repo secret THROWAWAY_HA_TOKEN. If unset, the test falls back
+# to a token file on the runner host. Recommendation: set the secret so token
+# rotation is one `gh secret set` away.
+
+on:
+  release:
+    types: [prereleased]
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Why are you running the gate manually? (logged in run summary)'
+        required: false
+        default: 'manual smoke check'
+
+jobs:
+  discovery-gate:
+    name: Tier 1 — real-HA discovery smoke test
+    # `self-hosted` is GitHub's reserved label for any self-hosted runner;
+    # `airwatch-throwaway` is the project-specific label assigned during
+    # runner registration. Both must match for this job to dispatch.
+    runs-on: [self-hosted, airwatch-throwaway]
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install gate deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-e2e.txt
+
+      - name: Run discovery smoke tests
+        env:
+          # TBD: point at the AirWatch throwaway HA once it exists. Placeholder
+          # port — do NOT reuse PollenWatch's protected :8124.
+          HA_URL: http://127.0.0.1:8200
+          HA_TOKEN: ${{ secrets.THROWAWAY_HA_TOKEN }}
+        run: pytest tests/e2e/test_real_ha_discovery.py -v

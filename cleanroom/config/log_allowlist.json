@@ -1,0 +1,5 @@
+{
+  "_doc": "CAGED. See cleanroom/README.md §'The log allowlist — CAGED on purpose'. Lint enforces: every entry requires non-empty `reason` and ISO `added` date; NO entry may reference migration / migrate / entity_id / registry / config_entry / selected_pollutants (case-insensitive). A migration-related ERROR is never muted — fix the source, don't silence the gate.",
+
+  "patterns": []
+}

@@ -1,1 +1,10 @@
-# TODO: port from pollenwatch/requirements-test.txt
+# Test/lint toolchain, pinned for reproducible CI.
+# pytest-homeassistant-custom-component pulls in pytest, pytest-asyncio, and a
+# matching Home Assistant core version.
+ruff==0.15.15
+pytest-homeassistant-custom-component==0.13.205
+# Needed by tests/e2e/test_real_ha_discovery.py (Tier 1 prerelease gate). In
+# regular CI the e2e tests skip — there's no HA on the GitHub runner — but the
+# import has to resolve at collection time. Pin matches requirements-e2e.txt
+# and cleanroom so version drift can't surprise us in three places.
+websockets==13.1

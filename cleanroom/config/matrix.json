@@ -1,0 +1,26 @@
+{
+  "_doc": "The two diagnostic config entries the bootstrap creates. AT LEAST TWO entries required; AT LEAST ONE must be a subset (fewer than the full canonical pollutant set). bootstrap.py asserts this — see cleanroom/bootstrap.py:_assert_matrix_invariants. The subset entry (B) is the diagnostic that distinguishes 'migration preserved selection' from 'reset to default-all'. An all-pollutants-only test proves nothing.",
+
+  "canonical_v1_pollutants": ["pm2_5", "pm10", "nitrogen_dioxide", "ozone", "sulphur_dioxide", "carbon_monoxide", "european_aqi"],
+
+  "entries": [
+    {
+      "name": "munich-all-pollutants",
+      "location_label": "Munich",
+      "latitude": 48.1351,
+      "longitude": 11.5820,
+      "pollutants": ["pm2_5", "pm10", "nitrogen_dioxide", "ozone", "sulphur_dioxide", "carbon_monoxide", "european_aqi"],
+      "options": {},
+      "_role": "common-case: all canonical pollutants. Validates the happy path."
+    },
+    {
+      "name": "graz-subset-pm25-pm10",
+      "location_label": "Graz",
+      "latitude": 47.0707,
+      "longitude": 15.4395,
+      "pollutants": ["pm2_5", "pm10"],
+      "options": {},
+      "_role": "DIAGNOSTIC: subset selection. THIS ENTRY IS NON-OPTIONAL. If migration silently resets to default-all, only Entry B catches it. Gate D asserts this entry's selection survives identical post-upgrade."
+    }
+  ]
+}

@@ -1,1 +1,28 @@
-# AirWatch CI — hassfest. STUB. TODO: port from pollenwatch/.github/workflows/validate.yml.
+name: Validate
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  hassfest:
+    name: Hassfest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: home-assistant/actions/hassfest@master
+
+  hacs:
+    name: HACS
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hacs/action@main
+        with:
+          category: integration
+          # Brand assets are submitted to home-assistant/brands as a separate
+          # step when v1.0 publishes; skip the check until then.
+          ignore: brands

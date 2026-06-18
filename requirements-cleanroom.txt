@@ -1,1 +1,3 @@
-# TODO: port from pollenwatch/requirements-cleanroom.txt
+# Cleanroom test runtime deps. Minimal on purpose — everything else is stdlib.
+# Pin exact versions; refresh deliberately (see cleanroom/README.md §HACS pin).
+websockets==13.1

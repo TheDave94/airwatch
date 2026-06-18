@@ -1,0 +1,17 @@
+{
+  "_doc": "The baseline airwatch version the cleanroom test installs FIRST, before upgrading to HEAD. AirWatch has NO released tag yet — the cleanroom harness cannot run end-to-end until v1 ships and a real tag is seeded here. The placeholder below documents the shape; replace default_baseline + the versions entry with the first real release tag (the version of record) once it exists.",
+
+  "default_baseline": "TBD",
+
+  "versions": {
+    "TBD": {
+      "flow_version": 1,
+      "pollutant_field": "selected_pollutants",
+      "notes": "PLACEHOLDER. AirWatch's config-entry VERSION=1, single-step config-flow, pollutant field 'selected_pollutants'. Replace this key with the first released git tag (e.g. v1.0.0) before running the harness; bootstrap errors loudly on an unknown baseline."
+    }
+  },
+
+  "head_flow_version": 1,
+
+  "_when_to_update": "Seed the first real tag under 'versions' (and set 'default_baseline' to it) once v1 is released. Add a new entry when a later release changes its flow VERSION or pollutant field. Bootstrap errors loudly on unknown baseline tag."
+}

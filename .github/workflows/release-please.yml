@@ -1,3 +1,53 @@
-# AirWatch CI — release automation (GitHub-App-token trick so required checks run).
-# STUB. TODO: port from pollenwatch/.github/workflows/release-please.yml.
-# Needs RELEASE_APP_CLIENT_ID / RELEASE_APP_PRIVATE_KEY secrets on the new repo.
+name: Release Please
+
+# Maintains a permanent "Release PR" that bumps the version + updates the
+# changelog from conventional-commit messages. Merging the Release PR cuts
+# a git tag + GitHub Release; HACS picks the release up directly from the tag.
+#
+# ## Why a GitHub App token (and not the default GITHUB_TOKEN)
+#
+# GitHub holds workflow runs on PRs opened by GITHUB_TOKEN in an
+# "approval-required" suspended state — required checks (cleanroom,
+# Ruff + pytest, Hassfest) do NOT run until someone clicks
+# "Approve workflows to run." That defeats the point of the release PR
+# being a hands-off artifact and blocks the step-3 auto-merge wiring
+# (auto-merge can never satisfy required checks that never started).
+#
+# Fix: mint a short-lived installation token from the
+# `airwatch-release-bot` GitHub App and pass it to release-please.
+# PRs opened under the App identity are NOT held in approval-required
+# state, so the required checks run on push and the release PR can flow
+# through gating naturally.
+#
+# Note: there is no `release:`-triggered downstream workflow in this repo
+# (HACS pulls source from the tag — no release-build.yml). The anti-loop
+# `release: published` suppression is NOT a factor here; the
+# approval-required behaviour is.
+#
+# release-please action SHA-pinned to v5.0.0; create-github-app-token
+# SHA-pinned to v3.2.0.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        id: app-token
+        with:
+          client-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
