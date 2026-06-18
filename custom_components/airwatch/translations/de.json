@@ -1,1 +1,61 @@
-{ "_comment": "TODO: adapt from pollenwatch translations/de.json." }
+{
+  "title": "AirWatch",
+  "config": {
+    "step": {
+      "user": {
+        "title": "AirWatch-Standort hinzufügen",
+        "description": "Die Luftqualitätsdaten stammen vom Copernicus Atmosphere Monitoring Service (CAMS) über Open-Meteo — kostenlos, ohne Schlüssel und EU-weit. Der Standort ist nach dem Einrichten fest — zum Ändern die Integration entfernen und neu hinzufügen. Schadstoffe und das Aktualisierungsintervall lassen sich danach in den Optionen ändern.",
+        "data": {
+          "location": "Standort",
+          "selected_pollutants": "Zu trackende Schadstoffe",
+          "update_interval": "Aktualisierungsintervall (Minuten)"
+        },
+        "data_description": {
+          "location": "Wähle den zu überwachenden Punkt. Open-Meteo rundet ihn auf die nächste Rasterzelle (~10 km).",
+          "selected_pollutants": "Pro ausgewähltem Schadstoff werden Sensoren je aktiver Quelle erstellt. Nicht ausgewählte Schadstoffe erzeugen keine Entitäten — hält die Installation schlank.",
+          "update_interval": "Wie oft Open-Meteo abgefragt wird. Mindestens 60 Minuten, um die kostenlose öffentliche API zu schonen."
+        }
+      }
+    },
+    "error": {
+      "no_pollutants": "Wähle mindestens einen Schadstoff aus.",
+      "cannot_connect": "Open-Meteo konnte nicht erreicht werden. Prüfe deine Verbindung und versuche es erneut."
+    },
+    "abort": {
+      "already_configured": "Dieser Standort ist bereits konfiguriert.",
+      "out_of_coverage": "Dieser Standort liegt außerhalb der europäischen CAMS-Abdeckung. Wähle einen Standort innerhalb Europas."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "AirWatch-Optionen",
+        "description": "Der Standort ist fest; zum Ändern die Integration entfernen und neu hinzufügen.",
+        "data": {
+          "selected_pollutants": "Zu trackende Schadstoffe",
+          "update_interval": "Aktualisierungsintervall (Minuten)"
+        },
+        "data_description": {
+          "selected_pollutants": "Pro ausgewähltem Schadstoff werden Sensoren je aktiver Quelle erstellt. Nicht ausgewählte Schadstoffe erzeugen keine Entitäten.",
+          "update_interval": "Wie oft Open-Meteo abgefragt wird. Mindestens 60 Minuten, um die kostenlose öffentliche API zu schonen."
+        }
+      }
+    },
+    "error": {
+      "no_pollutants": "Wähle mindestens einen Schadstoff aus."
+    }
+  },
+  "selector": {
+    "selected_pollutants": {
+      "options": {
+        "pm2_5": "PM2.5",
+        "pm10": "PM10",
+        "nitrogen_dioxide": "Stickstoffdioxid",
+        "ozone": "Ozon",
+        "sulphur_dioxide": "Schwefeldioxid",
+        "carbon_monoxide": "Kohlenmonoxid",
+        "european_aqi": "Europäischer Luftqualitätsindex"
+      }
+    }
+  }
+}

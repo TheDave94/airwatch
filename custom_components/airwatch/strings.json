@@ -1,1 +1,61 @@
-{ "_comment": "AirWatch UI strings. TODO: adapt from pollenwatch/.../strings.json (config/options step labels, pollutant names)." }
+{
+  "title": "AirWatch",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add an AirWatch location",
+        "description": "Air-quality data comes from the Copernicus Atmosphere Monitoring Service (CAMS) via Open-Meteo — free, keyless, and EU-wide. The location is fixed once set — to move it later, remove and re-add the integration. Pollutants and the update interval can be changed in Options afterwards.",
+        "data": {
+          "location": "Location",
+          "selected_pollutants": "Pollutants to track",
+          "update_interval": "Update interval (minutes)"
+        },
+        "data_description": {
+          "location": "Pick the point to monitor. Open-Meteo snaps it to the nearest ~10 km grid cell.",
+          "selected_pollutants": "Each selected pollutant creates sensors per active source. Unselected pollutants don't create any entities, keeping the install lean.",
+          "update_interval": "How often to poll Open-Meteo. Minimum 60 minutes to be a good citizen on a free public API."
+        }
+      }
+    },
+    "error": {
+      "no_pollutants": "Select at least one pollutant to track.",
+      "cannot_connect": "Could not reach Open-Meteo. Check your connection and try again."
+    },
+    "abort": {
+      "already_configured": "This location is already configured.",
+      "out_of_coverage": "This location is outside CAMS European coverage. Choose a location within Europe."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "AirWatch options",
+        "description": "The location is fixed; remove and re-add the integration to change it.",
+        "data": {
+          "selected_pollutants": "Pollutants to track",
+          "update_interval": "Update interval (minutes)"
+        },
+        "data_description": {
+          "selected_pollutants": "Each selected pollutant creates sensors per active source. Unselected pollutants don't create any entities.",
+          "update_interval": "How often to poll Open-Meteo. Minimum 60 minutes to be a good citizen on a free public API."
+        }
+      }
+    },
+    "error": {
+      "no_pollutants": "Select at least one pollutant to track."
+    }
+  },
+  "selector": {
+    "selected_pollutants": {
+      "options": {
+        "pm2_5": "PM2.5",
+        "pm10": "PM10",
+        "nitrogen_dioxide": "Nitrogen dioxide",
+        "ozone": "Ozone",
+        "sulphur_dioxide": "Sulphur dioxide",
+        "carbon_monoxide": "Carbon monoxide",
+        "european_aqi": "European AQI"
+      }
+    }
+  }
+}
