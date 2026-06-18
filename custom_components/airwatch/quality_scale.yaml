@@ -25,13 +25,7 @@ rules:
   brands: todo
   common-modules: done
   config-flow: done
-  config-flow-test-coverage:
-    status: todo
-    comment: |
-      The config + options flow is implemented (config_flow.py), but the HA-based
-      config-flow test suite is not yet ported from PollenWatch. The current
-      test surface is the pure data/analytics layer (analytics, pollutant
-      registry, Open-Meteo parse). Tracked for the first silver tag.
+  config-flow-test-coverage: done
   dependency-transparency: done
   docs-actions:
     status: exempt
@@ -79,12 +73,15 @@ rules:
       keyed source is ever added, SourceAuthError already exists in
       sources/base.py to drive a re-auth flow.
   test-coverage:
-    status: todo
+    status: done
     comment: |
-      The pure layer (analytics consensus/percentile, pollutant_registry bands,
-      Open-Meteo parse with injected transport) is unit-tested offline. The
-      HA-integration tests (init/setup, entity wiring, config-flow) are not yet
-      ported. Tracked for the first silver tag.
+      Pure layer unit-tested offline (analytics consensus/percentile,
+      pollutant_registry bands/provenance, Open-Meteo parse with injected
+      transport) plus HA-integration tests (config-flow + options, setup/unload,
+      entity wiring incl. the per-pollutant device_class + bands provenance,
+      diagnostics redaction, websocket API). ~83% line coverage; the uncovered
+      remainder is the frontend card static-path registration (no hass.http in
+      the test harness) and the standalone __main__ probe in open_meteo.
 
   # ------------------------- Gold (not claimed) -------------------------
   devices: done
