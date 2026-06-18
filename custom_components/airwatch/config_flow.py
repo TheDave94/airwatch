@@ -29,14 +29,19 @@ from homeassistant.helpers import selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import (
+    CONF_ENABLED,
+    CONF_MAX_DISTANCE_KM,
     CONF_SELECTED_POLLUTANTS,
     CONF_SOURCES,
+    CONF_STATIONS,
     CONF_UPDATE_INTERVAL,
+    DEFAULT_MAX_DISTANCE_KM,
     DEFAULT_SELECTED_POLLUTANTS,
     DEFAULT_UPDATE_INTERVAL_MIN,
     DOMAIN,
     MAX_UPDATE_INTERVAL_MIN,
     MIN_UPDATE_INTERVAL_MIN,
+    SOURCE_SENSOR_COMMUNITY,
     new_sources_config,
 )
 from .coordinator import AirWatchConfigEntry, _entry_option
@@ -78,6 +83,68 @@ _INTERVAL_SELECTOR = selector.NumberSelector(
         mode=selector.NumberSelectorMode.BOX,
     )
 )
+
+# --- optional Sensor.Community secondary source ---------------------------
+# Flow-local field keys (mapped onto the CONF_SOURCES[sensor_community] config).
+CONF_ENABLE_SC = "enable_sensor_community"
+CONF_SC_DISTANCE = "sensor_community_distance_km"
+CONF_SC_STATIONS = "sensor_community_stations"
+
+_SC_DISTANCE_SELECTOR = selector.NumberSelector(
+    selector.NumberSelectorConfig(
+        min=1, max=50, step=1, unit_of_measurement="km",
+        mode=selector.NumberSelectorMode.BOX,
+    )
+)
+
+
+def _parse_station_ids(raw: str) -> list[int]:
+    """Parse a comma-separated station-id string into a list of ints.
+
+    Non-numeric tokens are dropped silently — an empty result means
+    auto-discover the nearest sensors by distance.
+    """
+    ids: list[int] = []
+    for token in (raw or "").replace(" ", "").split(","):
+        if not token:
+            continue
+        try:
+            ids.append(int(token))
+        except ValueError:
+            continue
+    return ids
+
+
+def _sc_schema_fields(
+    *, enabled: bool, distance: float, stations: list[int] | None
+) -> dict:
+    """Schema fields for the optional Sensor.Community source (config + options)."""
+    return {
+        vol.Optional(CONF_ENABLE_SC, default=enabled): selector.BooleanSelector(),
+        vol.Optional(
+            CONF_SC_DISTANCE, default=distance
+        ): _SC_DISTANCE_SELECTOR,
+        vol.Optional(
+            CONF_SC_STATIONS,
+            default=",".join(str(s) for s in (stations or [])),
+        ): selector.TextSelector(),
+    }
+
+
+def _apply_sc_input(sources: dict, user_input: dict) -> dict:
+    """Overlay the submitted Sensor.Community fields onto a sources config.
+
+    Returns the same dict for convenience. When the user leaves everything at
+    its defaults this reproduces ``new_sources_config()``'s sensor_community
+    entry exactly (enabled=False, default distance, no explicit stations).
+    """
+    sc = sources.setdefault(SOURCE_SENSOR_COMMUNITY, {})
+    sc[CONF_ENABLED] = bool(user_input.get(CONF_ENABLE_SC, False))
+    sc[CONF_MAX_DISTANCE_KM] = float(
+        user_input.get(CONF_SC_DISTANCE, DEFAULT_MAX_DISTANCE_KM)
+    )
+    sc[CONF_STATIONS] = _parse_station_ids(user_input.get(CONF_SC_STATIONS, ""))
+    return sources
 
 
 async def _async_probe_coverage(
@@ -150,7 +217,9 @@ class AirWatchConfigFlow(ConfigFlow, domain=DOMAIN):
                         options={
                             CONF_SELECTED_POLLUTANTS: pollutants,
                             CONF_UPDATE_INTERVAL: interval,
-                            CONF_SOURCES: new_sources_config(),
+                            CONF_SOURCES: _apply_sc_input(
+                                new_sources_config(), user_input
+                            ),
                         },
                     )
 
@@ -172,6 +241,9 @@ class AirWatchConfigFlow(ConfigFlow, domain=DOMAIN):
                 vol.Required(
                     CONF_UPDATE_INTERVAL, default=DEFAULT_UPDATE_INTERVAL_MIN
                 ): _INTERVAL_SELECTOR,
+                **_sc_schema_fields(
+                    enabled=False, distance=DEFAULT_MAX_DISTANCE_KM, stations=[]
+                ),
             }
         )
         # On an error re-render, re-seed the form with what the user submitted
@@ -204,22 +276,27 @@ class AirWatchOptionsFlow(OptionsFlow):
         errors: dict[str, str] = {}
         entry = self.config_entry
 
+        # Copy current per-source config so we overlay (not mutate) it, and
+        # preserve sources the v1 UI doesn't expose (e.g. Land Steiermark).
+        current_sources = {
+            key: dict(value)
+            for key, value in _entry_option(
+                entry, CONF_SOURCES, new_sources_config()
+            ).items()
+        }
+
         if user_input is not None:
             pollutants = list(user_input.get(CONF_SELECTED_POLLUTANTS, []))
             if not pollutants:
                 errors[CONF_SELECTED_POLLUTANTS] = "no_pollutants"
             else:
-                # Preserve the seeded per-source config (v1 doesn't edit it).
-                sources = _entry_option(
-                    entry, CONF_SOURCES, new_sources_config()
-                )
                 return self.async_create_entry(
                     data={
                         CONF_SELECTED_POLLUTANTS: pollutants,
                         CONF_UPDATE_INTERVAL: int(
                             user_input[CONF_UPDATE_INTERVAL]
                         ),
-                        CONF_SOURCES: sources,
+                        CONF_SOURCES: _apply_sc_input(current_sources, user_input),
                     }
                 )
 
@@ -229,6 +306,7 @@ class AirWatchOptionsFlow(OptionsFlow):
         current_interval = _entry_option(
             entry, CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL_MIN
         )
+        sc_cfg = current_sources.get(SOURCE_SENSOR_COMMUNITY, {})
         schema = vol.Schema(
             {
                 vol.Required(
@@ -237,6 +315,13 @@ class AirWatchOptionsFlow(OptionsFlow):
                 vol.Required(
                     CONF_UPDATE_INTERVAL, default=current_interval
                 ): _INTERVAL_SELECTOR,
+                **_sc_schema_fields(
+                    enabled=bool(sc_cfg.get(CONF_ENABLED, False)),
+                    distance=float(
+                        sc_cfg.get(CONF_MAX_DISTANCE_KM, DEFAULT_MAX_DISTANCE_KM)
+                    ),
+                    stations=sc_cfg.get(CONF_STATIONS, []),
+                ),
             }
         )
         return self.async_show_form(

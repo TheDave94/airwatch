@@ -8,12 +8,18 @@
         "data": {
           "location": "Standort",
           "selected_pollutants": "Zu trackende Schadstoffe",
-          "update_interval": "Aktualisierungsintervall (Minuten)"
+          "update_interval": "Aktualisierungsintervall (Minuten)",
+          "enable_sensor_community": "Sensor.Community hinzufügen (lokales PM)",
+          "sensor_community_distance_km": "Sensor.Community-Suchradius (km)",
+          "sensor_community_stations": "Sensor.Community-Stations-IDs (optional)"
         },
         "data_description": {
           "location": "Wähle den zu überwachenden Punkt. Open-Meteo rundet ihn auf die nächste Rasterzelle (~10 km).",
           "selected_pollutants": "Pro ausgewähltem Schadstoff werden Sensoren je aktiver Quelle erstellt. Nicht ausgewählte Schadstoffe erzeugen keine Entitäten — hält die Installation schlank.",
-          "update_interval": "Wie oft Open-Meteo abgefragt wird. Mindestens 60 Minuten, um die kostenlose öffentliche API zu schonen."
+          "update_interval": "Wie oft Open-Meteo abgefragt wird. Mindestens 60 Minuten, um die kostenlose öffentliche API zu schonen.",
+          "enable_sensor_community": "Fügt nahegelegene Sensor.Community-PM2.5/PM10-Bürgersensoren als zweite Quelle hinzu und ermöglicht so Konsens und Divergenz über mehrere Quellen. Fehlerhafte SDS011-Werte (999,9) werden verworfen und die gültigen Stationen gemittelt.",
+          "sensor_community_distance_km": "Wie weit nach Bürgersensoren gesucht wird, wenn unten keine Stations-IDs angegeben sind.",
+          "sensor_community_stations": "Kommagetrennte Sensor-IDs zur exakten Nutzung (z. B. 45690,97590,85910). Leer lassen, um die nächstgelegenen Sensoren im Suchradius automatisch zu finden."
         }
       }
     },
@@ -33,11 +39,18 @@
         "description": "Der Standort ist fest; zum Ändern die Integration entfernen und neu hinzufügen.",
         "data": {
           "selected_pollutants": "Zu trackende Schadstoffe",
-          "update_interval": "Aktualisierungsintervall (Minuten)"
+          "update_interval": "Aktualisierungsintervall (Minuten)",
+          "enable_sensor_community": "Sensor.Community hinzufügen (lokales PM)",
+          "sensor_community_distance_km": "Sensor.Community-Suchradius (km)",
+          "sensor_community_stations": "Sensor.Community-Stations-IDs (optional)"
         },
         "data_description": {
           "selected_pollutants": "Pro ausgewähltem Schadstoff werden Sensoren je aktiver Quelle erstellt. Nicht ausgewählte Schadstoffe erzeugen keine Entitäten.",
-          "update_interval": "Wie oft Open-Meteo abgefragt wird. Mindestens 60 Minuten, um die kostenlose öffentliche API zu schonen."
+          "update_interval": "Wie oft Open-Meteo abgefragt wird. Mindestens 60 Minuten, um die kostenlose öffentliche API zu schonen.",
+          "enable_sensor_community": "Fügt nahegelegene Sensor.Community-PM2.5/PM10-Bürgersensoren als zweite Quelle hinzu und ermöglicht so Konsens und Divergenz über mehrere Quellen. Fehlerhafte SDS011-Werte (999,9) werden verworfen und die gültigen Stationen gemittelt.",
+          "update_interval": "Wie oft Open-Meteo abgefragt wird. Mindestens 60 Minuten, um die kostenlose öffentliche API zu schonen.",
+          "sensor_community_distance_km": "Wie weit nach Bürgersensoren gesucht wird, wenn keine Stations-IDs angegeben sind.",
+          "sensor_community_stations": "Kommagetrennte Sensor-IDs zur exakten Nutzung (z. B. 45690,97590,85910). Leer lassen, um die nächstgelegenen Sensoren im Suchradius automatisch zu finden."
         }
       }
     },

@@ -20,9 +20,12 @@ threshold it is**.
 
 - **Primary source — [Open-Meteo](https://open-meteo.com/) / CAMS:** free,
   keyless, hourly, EU-wide µg/m³, with a 92-day backfill and ~5-day forecast.
-- **Secondary sources** *(planned, opt-in):*
-  [Sensor.Community](https://sensor.community/) hyperlocal citizen sensors and
-  Land Steiermark official daily-mean stations.
+- **Secondary source — [Sensor.Community](https://sensor.community/)** *(opt-in):*
+  hyperlocal citizen PM2.5/PM10 sensors. Auto-discovers the nearest stations (or
+  use explicit station IDs), averages the valid ones, and **rejects SDS011 fault
+  readings** (the stuck-at-max 999.9) and stale data. Enabling it gives the
+  consensus/divergence analytics a second source to cross-check Open-Meteo.
+- **Land Steiermark** official daily-mean stations *(planned, opt-in)*.
 - **Pollutants:** PM2.5, PM10, NO₂, O₃, SO₂, CO, and the European AQI index.
 
 ## Sensors
@@ -95,7 +98,7 @@ also matches the WHO/EU mass-concentration basis used for CO bands.
 | Coordinators · config flow · entities (raw / percentile / consensus / divergence) | ✅ implemented |
 | Pollutant registry · WHO + EAQI bands · provenance | ✅ implemented |
 | Governance (cleanroom no-loss gates · release-please · CI) | ✅ ported |
-| Sensor.Community secondary source | 🚧 planned |
+| Sensor.Community secondary source (fault-rejecting, consensus-enabled) | ✅ implemented, live-verified |
 | Land Steiermark secondary source | 🚧 planned (disabled by default) |
 | Lovelace card (AQI colour ramps) | 🚧 planned |
 | Published to HACS | ⛔ not yet |
