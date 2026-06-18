@@ -1,0 +1,5 @@
+# AirWatch — packaging + tooling (Ruff/pytest config). STUB.
+# TODO: port from pollenwatch/pyproject.toml; set name=airwatch, version managed by release-please.
+[project]
+name = "airwatch"
+version = "0.0.0"

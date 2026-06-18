@@ -1,0 +1,3 @@
+# AirWatch CI — Tier-1 discovery smoke test (on release: prereleased).
+# STUB. TODO: port from pollenwatch/.github/workflows/prerelease-gate.yml.
+# Adapt: throwaway-HA target, WS endpoint name (airwatch/config).

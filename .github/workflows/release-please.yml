@@ -1,0 +1,3 @@
+# AirWatch CI — release automation (GitHub-App-token trick so required checks run).
+# STUB. TODO: port from pollenwatch/.github/workflows/release-please.yml.
+# Needs RELEASE_APP_CLIENT_ID / RELEASE_APP_PRIVATE_KEY secrets on the new repo.

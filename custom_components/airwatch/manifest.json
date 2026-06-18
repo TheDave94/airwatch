@@ -1,0 +1,15 @@
+{
+  "domain": "airwatch",
+  "name": "AirWatch",
+  "version": "0.0.0",
+  "documentation": "https://github.com/TheDave94/airwatch",
+  "issue_tracker": "https://github.com/TheDave94/airwatch/issues",
+  "codeowners": ["@TheDave94"],
+  "config_flow": true,
+  "iot_class": "cloud_polling",
+  "integration_type": "service",
+  "quality_scale": "silver",
+  "dependencies": [],
+  "requirements": [],
+  "_TODO": "Scaffold only. Adapt from pollenwatch/manifest.json. Repo URL pending name decision (see OPEN_QUESTIONS.md); version managed by release-please."
+}

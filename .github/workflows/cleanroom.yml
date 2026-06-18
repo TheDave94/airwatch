@@ -1,0 +1,3 @@
+# AirWatch CI — no-loss migration gate (Gates A-D).
+# STUB. TODO: port from pollenwatch/.github/workflows/cleanroom.yml.
+# Adapt: baseline tag (AirWatch has none yet -> seed once v1 ships), path filters.
