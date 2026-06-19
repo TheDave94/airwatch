@@ -152,7 +152,7 @@ def _apply_sc_input(sources: dict, user_input: dict) -> dict:
 
 
 # --- optional Land Steiermark secondary source (DRIFT ANCHOR) -------------
-# Disabled by default (OPEN_QUESTIONS.md Q6): the official feed is a lagged,
+# Disabled by default (docs/dev/OPEN_QUESTIONS.md Q6): the official feed is a lagged,
 # best-effort SensorThings harvest, surfaced as a slow drift anchor.
 CONF_ENABLE_LS = "enable_land_steiermark"
 CONF_LS_STATION = "land_steiermark_station"

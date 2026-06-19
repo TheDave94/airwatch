@@ -184,7 +184,7 @@ def build_coordinators(
             )
 
     # Land Steiermark: secondary daily-mean source, disabled-by-default until a
-    # clean live feed exists (OPEN_QUESTIONS.md Q6).
+    # clean live feed exists (docs/dev/OPEN_QUESTIONS.md Q6).
     ls_cfg = sources_cfg.get(SOURCE_LAND_STEIERMARK, {})
     if ls_cfg.get(CONF_ENABLED):
         from .sources.land_steiermark import LandSteiermarkSource

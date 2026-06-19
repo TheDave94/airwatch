@@ -1,5 +1,11 @@
 # AirWatch
 
+[![Release](https://img.shields.io/github/v/release/TheDave94/airwatch?include_prereleases&sort=semver&color=2E7DD1)](https://github.com/TheDave94/airwatch/releases)
+[![Validate](https://github.com/TheDave94/airwatch/actions/workflows/validate.yml/badge.svg)](https://github.com/TheDave94/airwatch/actions/workflows/validate.yml)
+[![Lint & Test](https://github.com/TheDave94/airwatch/actions/workflows/lint.yml/badge.svg)](https://github.com/TheDave94/airwatch/actions/workflows/lint.yml)
+[![hacs](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-2A3540.svg)](LICENSE)
+
 Multi-source outdoor **air-quality** aggregator for Home Assistant, distributed
 as a [HACS](https://hacs.xyz/) custom repository. Sibling project to
 [PollenWatch](https://github.com/TheDave94/pollenwatch) — the same multi-source /
@@ -116,6 +122,14 @@ also matches the WHO/EU mass-concentration basis used for CO bands.
    location and the pollutants to track; AirWatch probes Open-Meteo coverage
    before finishing.
 
+### Manual installation
+
+If you don't use HACS: download the latest
+[release](https://github.com/TheDave94/airwatch/releases), copy
+`custom_components/airwatch/` into your Home Assistant `config/custom_components/`
+directory, restart Home Assistant, then add the integration via **Settings →
+Devices & Services**.
+
 ## Lovelace card
 
 Installing AirWatch also delivers a bundled **`custom:airwatch-card`** — one
@@ -204,6 +218,33 @@ Design rationale lives in the HA-config atlas:
 `docs/atlas/air-quality-fusion-roadmap.md` §9 (in the `homeassistant-config`
 repo).
 
+## Troubleshooting
+
+**The card doesn't appear in the picker.** The integration registers the card on
+first load; hard-reload the browser (Cmd/Ctrl+Shift+R) after install and restart.
+If it still doesn't show, confirm the resource
+`/airwatch_card_static/airwatch-card.js` loads (browser network tab).
+
+**A pollutant shows "Unknown".** A source is stale or returned no valid reading
+for that pollutant — AirWatch reports `Unknown` rather than a misleading value
+(never a fake "good"). Sensor.Community stations can go offline; Land Steiermark
+is a lagged drift anchor that reports `Unknown` once its readings exceed the
+staleness window. Consensus reflects whichever sources are currently valid.
+
+**Setup fails with "out of coverage".** AirWatch probes Open-Meteo CAMS coverage
+before finishing setup — pick a location within the CAMS European domain.
+
+**Consensus shows only one source.** `source_count` reflects how many enabled
+sources actually cover that pollutant. Sensor.Community is PM-only, so NO₂/O₃/SO₂
+stay single-source unless another gas-capable source is enabled.
+
+## Contributing
+
+Issues and pull requests are welcome — open an
+[issue](https://github.com/TheDave94/airwatch/issues) for bugs or feature ideas.
+For local development the unit suite lives under `tests/` (run with `pytest`),
+and the [cleanroom no-loss harness](cleanroom/) is used as a release gate.
+
 ## License
 
-MIT.
+[MIT](LICENSE)

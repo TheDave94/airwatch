@@ -8,7 +8,7 @@ pollutant lives here too.
 This is the REBUILD analogue of PollenWatch's ``species_registry.py``. The
 PollenWatch ``ThresholdStatus`` *evidence-provenance* concept is reused here as
 :class:`BandAuthority` — a band's authority is **observable rather than asserted**
-(OPEN_QUESTIONS.md Q4). We do not invent thresholds; every band cites its
+(docs/dev/OPEN_QUESTIONS.md Q4). We do not invent thresholds; every band cites its
 **authority + value + averaging window**, and — for the WHO health bands — the
 **systematic-review DOI** it rests on.
 
@@ -107,7 +107,7 @@ class BandAuthority(StrEnum):
 # --- EAQI band presentation -----------------------------------------------
 #: 1-based EAQI band → (label, hex colour). Official EEA European Air Quality
 #: Index palette (shared by the classic and revised index — same 6 band names).
-#: Drives the card colour ramp (OPEN_QUESTIONS.md Q5).
+#: Drives the card colour ramp (docs/dev/OPEN_QUESTIONS.md Q5).
 EAQI_BANDS: Final[dict[int, tuple[str, str]]] = {
     1: ("good", "#50f0e6"),
     2: ("fair", "#50ccaa"),
@@ -383,7 +383,7 @@ class PollutantInfo:
     ``device_class`` is the HA sensor device_class string, or ``None`` to omit it.
     CO omits the device_class deliberately: HA's ``carbon_monoxide`` class accepts
     ppm only, and AirWatch keeps the source's native µg/m³ rather than baking in a
-    temperature/pressure conversion (OPEN_QUESTIONS.md Q3). The other concentration
+    temperature/pressure conversion (docs/dev/OPEN_QUESTIONS.md Q3). The other concentration
     pollutants' device_class accepts µg/m³ natively.
 
     ``sources`` is the *global* set — the upstream sources that can report this
@@ -631,7 +631,7 @@ def band_provenance(pollutant: str, value: float | None) -> dict[str, Any]:
     """Provenance-tagged band assessments for a reading — authorities DISTINCT.
 
     Returns a dict keyed by authority, each entry carrying its provenance and
-    **never** collapsed into a single verdict (OPEN_QUESTIONS.md Q4):
+    **never** collapsed into a single verdict (docs/dev/OPEN_QUESTIONS.md Q4):
 
     - ``eaqi_classic`` / ``eaqi_eea_2024`` — single dict each (band + averaging +
       colour). ``european_aqi`` carries only the classic index band; CO carries

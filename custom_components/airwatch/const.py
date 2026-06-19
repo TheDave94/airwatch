@@ -49,7 +49,7 @@ SOURCE_SENSOR_COMMUNITY: Final = "sensor_community"
 SOURCE_SENSOR_COMMUNITY_NAME: Final = "Sensor.Community"
 
 # Secondary: Land Steiermark official daily-mean stations. Shipped
-# DISABLED-BY-DEFAULT in v1 (no clean live feed yet — see OPEN_QUESTIONS.md Q6).
+# DISABLED-BY-DEFAULT in v1 (no clean live feed yet — see docs/dev/OPEN_QUESTIONS.md Q6).
 SOURCE_LAND_STEIERMARK: Final = "land_steiermark"
 SOURCE_LAND_STEIERMARK_NAME: Final = "Land Steiermark"
 
@@ -114,7 +114,7 @@ def new_sources_config() -> dict[str, dict[str, object]]:
 
     Open-Meteo is always on (keyless, primary). Sensor.Community is off by
     default (opt-in, needs a nearby sensor). Land Steiermark is off by default
-    until a clean live feed exists (OPEN_QUESTIONS.md Q6).
+    until a clean live feed exists (docs/dev/OPEN_QUESTIONS.md Q6).
     """
     return {
         SOURCE_OPEN_METEO: {CONF_ENABLED: True},
@@ -132,7 +132,7 @@ def new_sources_config() -> dict[str, dict[str, object]]:
 
 
 # --- defaults and guardrails ----------------------------------------------
-# v1 onboarding default: all CAMS pollutants enabled (OPEN_QUESTIONS.md Q7).
+# v1 onboarding default: all CAMS pollutants enabled (docs/dev/OPEN_QUESTIONS.md Q7).
 DEFAULT_SELECTED_POLLUTANTS: Final[list[str]] = list(POLLUTANTS)
 
 # Open-Meteo fetch window. recent_percentile baselines today against the

@@ -83,7 +83,7 @@ class PollutantSeries:
 
     ``unit`` is the unit the *source* reported (e.g. CAMS/Open-Meteo µg/m³).
     AirWatch preserves the source's native unit rather than transforming it —
-    the no-transform/expose-provenance ethos (see OPEN_QUESTIONS.md Q3).
+    the no-transform/expose-provenance ethos (see docs/dev/OPEN_QUESTIONS.md Q3).
     """
 
     pollutant: str

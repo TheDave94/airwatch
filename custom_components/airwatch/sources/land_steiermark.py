@@ -7,7 +7,7 @@ Fraunhofer IOSB (project API4INSPIRE).
 
 Why "drift anchor", not a live source
 -------------------------------------
-OPEN_QUESTIONS.md Q6 shipped Land Steiermark *disabled by default* because no
+docs/dev/OPEN_QUESTIONS.md Q6 shipped Land Steiermark *disabled by default* because no
 clean real-time feed was known. A 2026-06-19 read-only investigation refined
 that: a machine-readable, hourly-structured, coordinate-tagged SensorThings feed
 *does* exist and carries Steiermark PM10 / PM2.5 / NO2 / O3 / SO2 / CO with
@@ -549,7 +549,7 @@ class LandSteiermarkSource:
     Drift-anchor (slow reference) source — see the module docstring. With an
     explicit ``station`` localId it queries that station directly; otherwise it
     discovers Steiermark stations near the location and reports the nearest in
-    range. Disabled by default (OPEN_QUESTIONS.md Q6); HA-free with an injectable
+    range. Disabled by default (docs/dev/OPEN_QUESTIONS.md Q6); HA-free with an injectable
     transport so parsing is unit-testable offline.
     """
 
