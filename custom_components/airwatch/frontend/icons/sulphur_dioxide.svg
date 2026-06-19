@@ -1,0 +1,3 @@
+<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <path d="M32 41 L18 22" fill="none" stroke="var(--aw-grain-stroke,#2A3540)" stroke-width="2" stroke-linecap="round"></path><path d="M32 41 L46 22" fill="none" stroke="var(--aw-grain-stroke,#2A3540)" stroke-width="2" stroke-linecap="round"></path><circle cx="18" cy="22" r="6.8" fill="var(--aw-grain-fill,#E8EBEE)" stroke="var(--aw-grain-stroke,#2A3540)" stroke-width="2.2"></circle><circle cx="46" cy="22" r="6.8" fill="var(--aw-grain-fill,#E8EBEE)" stroke="var(--aw-grain-stroke,#2A3540)" stroke-width="2.2"></circle><circle cx="32" cy="41" r="10.4" fill="var(--aw-grain-fill,#E8EBEE)" stroke="var(--aw-grain-stroke,#2A3540)" stroke-width="2.2"></circle>
+</svg>

@@ -1,20 +1,32 @@
 /**
  * airwatch-card.js — Lovelace custom card for AirWatch.
  *
- * Progressive disclosure (the decided model):
- *   - EVERYDAY SURFACE (always visible): a headline severity — the worst
- *     revised-EEA sub-index across the displayed pollutants, shown with the
- *     official EEA colour ramp — plus one compact row per pollutant carrying
- *     its current reading and its own revised-EEA band colour. This is the
- *     glance value: "what is the air doing now."
- *   - ON EXPAND / TAP (the depth): per pollutant, the multi-authority
- *     provenance — what WHO 2021 (per averaging window + interim targets),
- *     EU 2024/2881 (both milestones) and the classic-vs-revised EEA indexes
- *     each say about this reading — and the cross-source consensus (n/m
- *     sources, agree / disagree). Opt-in, not always-on.
+ * Visual identity ADAPTED from the PollenWatch design system (the family
+ * resemblance is deliberate): Bricolage Grotesque + Hanken Grotesk typography,
+ * the neutral paper/cloud/ink palette, the card anatomy (mark · title · meta →
+ * hero gauge → reading → breakdown rows), the status-pill treatment, and the
+ * categorical severity GAUGE mechanics — needle resting at a segment centre
+ * (never an interpolated value), "higher is worse", calm motion, and
+ * gray-never-green for empty readings. See brand/README.md + brand/tokens.css.
  *
- * The card is a pure CONSUMER of the entity model the data layer already
- * produces (it changes nothing server-side):
+ * Domain swaps for air quality:
+ *   - Severity ramp = the official EEA 6-band air-quality ramp (the
+ *     science-anchored colours the data layer already emits in
+ *     bands.eaqi_eea_2024.colour — the single source of truth; this card never
+ *     invents severity colours). The 3-segment pollen dial becomes a 6-segment
+ *     EEA dial; "higher is worse" is preserved.
+ *   - Brand accent = an air/atmosphere azure (the --pw-gold analog) → --aw-sky.
+ *   - Per-pollutant glyphs (PM2.5/PM10/NO2/O3/SO2/CO) replace the per-species
+ *     grains, in the same color-neutral --aw-grain-* treatment.
+ *
+ * Progressive disclosure (unchanged): the everyday surface is the hero gauge
+ * (worst revised-EEA sub-index) + a compact per-pollutant row each with its own
+ * band; on tap, each row opens its multi-authority provenance (WHO 2021 / EU
+ * 2024/2881 / classic-vs-revised EEA) and cross-source consensus (n/m, agree /
+ * disagree).
+ *
+ * The card is a pure CONSUMER of the entity model the data layer produces (it
+ * changes nothing server-side):
  *   - sensor.airwatch_<source>_<pollutant>          — current reading; attrs:
  *       level (0/1/2), level_label, bands {authority: …}, unit_of_measurement,
  *       value_ppm (CO), forecast, station.
@@ -28,20 +40,16 @@
  * via the /airwatch_card_static static path. Config (all optional):
  *   { type: 'custom:airwatch-card', title?, pollutants?: [...],
  *     sources?: [...], expanded_default?: false }
- *
- * Mirrors PollenWatch's card conventions (vanilla-JS IIFE, shadow DOM, themed
- * CSS, WS discovery with a hass.states scan fallback) — but the severity model
- * is air-quality bands, not pollen levels.
  */
 (() => {
-  const CARD_VERSION = '0.1.0';
+  const CARD_VERSION = '0.2.0';  // visual-identity pass (PollenWatch-adapted)
 
   // ── Severity palettes ────────────────────────────────────────────────
   // EEA European Air Quality Index palette — mirrors pollutant_registry.
   // EAQI_BANDS (the single source of truth server-side). Each raw sensor
   // already carries the resolved colour in bands.<authority>.colour, so the
   // card reads that where available and falls back to this table only for the
-  // headline/legend or a missing attribute. Band names + colours are shared by
+  // gauge/legend or a missing attribute. Band names + colours are shared by
   // the classic and the revised EEA index (same 6 bands, different cut-points).
   const EAQI_PALETTE = {
     1: { label: 'Good', colour: '#50f0e6' },
@@ -55,19 +63,18 @@
   // The common 0/1/2 severity scale (analytics.LEVEL_LABELS). Used for CO —
   // which is NOT in the EAQI and whose severity is WHO/EU-driven — and for the
   // per-source level dots in the consensus breakdown. Deliberately a DIFFERENT,
-  // 3-step semantic ramp (green/amber/red, shared with the maintainer's
-  // PollenWatch card) so CO never masquerades as a 6-band EAQI rating.
+  // 3-step semantic ramp (green/amber/red) so CO never masquerades as a 6-band
+  // EAQI rating.
   const LEVEL_PALETTE = {
     0: { label: 'Good', colour: '#3DAE5A' },
     1: { label: 'Elevated', colour: '#F2A516' },
     2: { label: 'High', colour: '#E0492E' },
   };
   const UNKNOWN_COLOUR = '#AEB7C0';
+  const SLATE = '#33414F';
+  const SKY = '#2E7DD1';
 
   // ── Pollutant display identities ─────────────────────────────────────
-  // Presentational only (subscripted formulae the WS pollutant_names map does
-  // not carry). Names themselves come from the integration via WS / the sensor
-  // friendly_name; this is the formula chip + ordering hint.
   const POLLUTANT_DISPLAY = {
     pm2_5: { name: 'PM2.5', formula: 'PM₂.₅' },
     pm10: { name: 'PM10', formula: 'PM₁₀' },
@@ -77,26 +84,28 @@
     carbon_monoxide: { name: 'Carbon monoxide', formula: 'CO' },
     european_aqi: { name: 'European AQI', formula: 'EAQI' },
   };
-  // Stable display order; anything unknown sorts last alphabetically.
   const POLLUTANT_ORDER = [
     'pm2_5', 'pm10', 'nitrogen_dioxide', 'ozone',
     'sulphur_dioxide', 'carbon_monoxide', 'european_aqi',
   ];
+  // Pollutants that have a bundled glyph (served at /airwatch_card_static/icons).
+  const GLYPH_KEYS = new Set([
+    'pm2_5', 'pm10', 'nitrogen_dioxide', 'ozone', 'sulphur_dioxide',
+    'carbon_monoxide',
+  ]);
 
-  // The five concentration pollutants that define the EEA aggregate index.
-  // The headline severity is the WORST of these revised-EEA sub-indexes — the
-  // EAQI is, by definition, the worst sub-index. CO (different basis) and
-  // european_aqi (itself an aggregate) are excluded from the headline so they
-  // don't double-count, but they still render as their own rows.
+  // The five concentration pollutants that define the EEA aggregate index. The
+  // hero gauge shows the WORST of these revised-EEA sub-indexes — the EAQI is,
+  // by definition, the worst sub-index. CO (different basis) and european_aqi
+  // (itself an aggregate) are excluded from the gauge so they don't
+  // double-count, but they still render as their own rows.
   const EAQI_SUBINDEX_POLLUTANTS = new Set([
     'pm2_5', 'pm10', 'nitrogen_dioxide', 'ozone', 'sulphur_dioxide',
   ]);
 
-  // Source resolution. Open-Meteo (CAMS) is the primary, covers every
-  // pollutant, and always carries the band provenance, so it is the preferred
-  // "headline reading" source; the citizen + official networks fill in / cross-
-  // validate. The card reads the first available source in this order for the
-  // glance reading, and shows all of them in the consensus breakdown.
+  // Open-Meteo (CAMS) is primary, covers every pollutant, and always carries
+  // band provenance, so it is the preferred "headline reading" source; the
+  // citizen + official networks fill in / cross-validate.
   const SOURCE_PRIORITY = ['open_meteo', 'sensor_community', 'land_steiermark'];
   const SOURCE_LABELS = {
     open_meteo: 'Open-Meteo (CAMS)',
@@ -104,7 +113,6 @@
     land_steiermark: 'Land Steiermark',
   };
 
-  // Authorities, in the order they read in the expanded provenance block.
   const AUTHORITY_LABELS = {
     eaqi_eea_2024: 'EEA index (2024 revised)',
     eaqi_classic: 'EEA index (classic / Open-Meteo)',
@@ -116,19 +124,69 @@
 
   const DOMAIN = 'airwatch';
 
+  // ── AirWatch brand mark (header lockup) ──────────────────────────────
+  // Adapted from PollenWatch's flower mark: same warning-gauge construction
+  // (arc + slate needle), with the pollen bloom → an air/wind swirl and the
+  // pollen-grain sunbursts → drifting PM-particle dots. Arc uses EEA-anchored
+  // cyan→yellow→red stops. Kept verbatim in brand/assets/icon.svg.
+  const AW_MARK = `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M24.32 41.66 A27 27 0 0 1 37.95 25.84" stroke="#50ccaa" stroke-width="8" fill="none" stroke-linecap="round"></path><path d="M40.1 24.88 A27 27 0 0 1 59.9 24.88" stroke="#f0e641" stroke-width="8" fill="none" stroke-linecap="round"></path><path d="M62.05 25.84 A27 27 0 0 1 75.68 41.66" stroke="#ff5050" stroke-width="8" fill="none" stroke-linecap="round"></path><g opacity="0.62" fill="none" stroke-linecap="round"><path d="M32 45 H54.5 a5 5 0 1 0 -4.6 -5" stroke="#2E7DD1" stroke-width="3.3"></path><path d="M30 52.5 H58.5 a5.6 5.6 0 1 1 -5.2 5.6" stroke="#2E7DD1" stroke-width="3.3"></path><path d="M34.5 60 H51.5 a4.4 4.4 0 1 0 -4.1 4.4" stroke="#7CC0F2" stroke-width="3.3"></path></g><g fill="#2E7DD1"><circle cx="77" cy="54" r="2.7" opacity="0.92"></circle><circle cx="68" cy="70.5" r="2.1" opacity="0.6"></circle><circle cx="50" cy="79" r="2.8" opacity="0.92"></circle><circle cx="32" cy="70.5" r="2.1" opacity="0.6"></circle><circle cx="23" cy="54" r="2.7" opacity="0.92"></circle></g><path d="M50 50 L67.84 33.94" stroke="#33414F" stroke-width="4.5" stroke-linecap="round"></path><circle cx="50" cy="50" r="3" fill="#33414F"></circle></svg>`;
+
+  // ── Per-pollutant glyph loading (color-neutral; tinted by the card) ──
+  const ICON_URL = (key) => `/airwatch_card_static/icons/${key}.svg`;
+  const ICON_CACHE = new Map();
+  async function loadGlyph(key) {
+    if (ICON_CACHE.has(key)) return ICON_CACHE.get(key);
+    try {
+      const r = await fetch(ICON_URL(key));
+      const svg = r.ok ? await r.text() : null;
+      ICON_CACHE.set(key, svg);
+      return svg;
+    } catch (_e) {
+      ICON_CACHE.set(key, null);
+      return null;
+    }
+  }
+
+  // ── Web-font loading (best-effort; degrades to the system stack) ─────
+  // The card's typography is Bricolage Grotesque + Hanken Grotesk (Google
+  // Fonts, OFL). Inject the stylesheet once per document; if it fails (offline,
+  // CSP), the font tokens fall back to the HA/system sans so nothing breaks.
+  let _fontsInjected = false;
+  function ensureFonts() {
+    if (_fontsInjected) return;
+    _fontsInjected = true;
+    try {
+      const head = document.head;
+      if (!head || head.querySelector('link[data-aw-fonts]')) return;
+      const mk = (rel, href, cross) => {
+        const l = document.createElement('link');
+        l.rel = rel; l.href = href;
+        if (cross) l.crossOrigin = 'anonymous';
+        return l;
+      };
+      const css = mk('stylesheet',
+        'https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Hanken+Grotesk:wght@400;500;600;700&display=swap');
+      css.setAttribute('data-aw-fonts', '');
+      head.append(
+        mk('preconnect', 'https://fonts.googleapis.com'),
+        mk('preconnect', 'https://fonts.gstatic.com', true),
+        css,
+      );
+    } catch (_e) { /* best-effort */ }
+  }
+
   // ── helpers ──────────────────────────────────────────────────────────
   const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
   const isNum = (v) => v !== null && v !== undefined && v !== '' && !Number.isNaN(Number(v));
 
-  // Prettify a registry band key ("very_poor" -> "Very poor").
   function bandLabel(key) {
     if (!key) return null;
     return cap(String(key).replace(/_/g, ' '));
   }
 
   // Black or white text for legibility on a band-colour chip (per-channel
-  // luminance). Keeps the bright low bands readable and the dark high bands
-  // inverted without a per-band lookup.
+  // luminance) — essential because the EEA ramp spans very light (cyan) to very
+  // dark (purple) bands.
   function textOn(hex) {
     if (!hex || hex[0] !== '#' || hex.length < 7) return '#1c2530';
     const r = parseInt(hex.slice(1, 3), 16);
@@ -138,8 +196,6 @@
     return lum > 0.6 ? '#1c2530' : '#ffffff';
   }
 
-  // Round a reading for display without faking precision: integers stay
-  // integers, sub-10 values keep one decimal.
   function fmtReading(v) {
     const n = Number(v);
     if (!Number.isFinite(n)) return '—';
@@ -147,19 +203,14 @@
     return String(Math.round(n * 10) / 10);
   }
 
-  // Pick the severity descriptor for one pollutant's headline reading. CO and
-  // european_aqi are special-cased so we never invent a revised-EEA band for a
-  // pollutant the EEA index doesn't define.
-  //   returns { colour, label, band, basis, rank } | null
-  // `rank` is the comparable magnitude for the headline (revised band index
-  // 1–6, or CO/european level 0–2 lifted into the same axis only for display).
+  //   returns { colour, label, band, basis } | null
   function severityFor(pollutant, ent) {
     const bands = ent?.attributes?.bands || {};
     if (pollutant === 'carbon_monoxide') {
       const lvl = ent?.attributes?.level;
       if (lvl === null || lvl === undefined) return null;
       const p = LEVEL_PALETTE[lvl] || LEVEL_PALETTE[0];
-      return { colour: p.colour, label: p.label, basis: 'WHO / EU', band: null, rank: lvl };
+      return { colour: p.colour, label: p.label, basis: 'WHO / EU', band: null };
     }
     if (pollutant === 'european_aqi') {
       const c = bands.eaqi_classic;
@@ -167,26 +218,19 @@
       return {
         colour: c.colour || EAQI_PALETTE[c.band_index]?.colour || UNKNOWN_COLOUR,
         label: bandLabel(c.band) || EAQI_PALETTE[c.band_index]?.label,
-        basis: 'classic index', band: c.band_index, rank: null,
+        basis: 'classic index', band: c.band_index,
       };
     }
-    // The five concentration sub-indexes: the revised EEA band is the official
-    // severity (the colour ramp the everyday surface shows).
     const r = bands.eaqi_eea_2024;
     if (!r) return null;
     return {
       colour: r.colour || EAQI_PALETTE[r.band_index]?.colour || UNKNOWN_COLOUR,
       label: bandLabel(r.band) || EAQI_PALETTE[r.band_index]?.label,
-      basis: 'revised EEA', band: r.band_index, rank: r.band_index,
+      basis: 'revised EEA', band: r.band_index,
     };
   }
 
   // ── per-pollutant resolution against hass.states ─────────────────────
-  // Builds the view-model row: the headline source + reading + severity, the
-  // consensus overlay, and the divergence flag. Tolerant of every state the
-  // data layer actually produces — a disabled source simply has no entity, a
-  // stale/all-invalid source goes unavailable (the fail-safe), and a pollutant
-  // with no readable source resolves to `unknown`.
   function resolvePollutant(hass, pollutant, sourceFilter) {
     const states = hass.states;
     let primary = null;
@@ -206,7 +250,6 @@
     };
 
     if (!primary) {
-      // No readable source for this pollutant: honest unknown (gray, no band).
       return {
         pollutant, ...disp, state: 'unknown',
         reading: null, unit: '', severity: null,
@@ -230,9 +273,6 @@
     };
   }
 
-  // Consensus overlay for a row: n/m badge + per-source mini-rows + the
-  // mixed/agree verdict. Reads source_levels off the consensus sensor and the
-  // matching raw sensors for the per-source values.
   function consensusView(hass, pollutant, consensusEnt) {
     if (!consensusEnt) return null;
     const a = consensusEnt.attributes || {};
@@ -253,113 +293,222 @@
     return { state, count, max, rows };
   }
 
+  // ── EEA 6-band severity gauge (adapts the PollenWatch gauge mechanics) ─
+  // viewBox 0 0 120 92; 6 segments green/cyan→purple, opening downward. The
+  // needle rests at the ACTIVE band's segment centre (never interpolated) and
+  // is removed for the unknown state (dashed gray track, gray-never-green). The
+  // active segment thickens and the hub takes its colour ("status hub"). A
+  // subtle air-swirl under the dial echoes the brand mark.
+  const GA = { CX: 60, CY: 60, R: 44, W: 11, H: 78, GAP: 2, N: 6 };
+  const gpt = (r, deg) => {
+    const a = (deg - 90) * Math.PI / 180;
+    return [GA.CX + r * Math.cos(a), GA.CY + r * Math.sin(a)];
+  };
+  const gf = (n) => Math.round(n * 100) / 100;
+  function gArc(a0, a1, col, w, op = 1, dash = null) {
+    const [x0, y0] = gpt(GA.R, a0);
+    const [x1, y1] = gpt(GA.R, a1);
+    const large = (a1 - a0) > 180 ? 1 : 0;
+    const d = dash ? ` stroke-dasharray="${dash}"` : '';
+    return `<path d="M${gf(x0)} ${gf(y0)} A${GA.R} ${GA.R} 0 ${large} 1 ${gf(x1)} ${gf(y1)}" stroke="${col}" stroke-width="${w}" fill="none" stroke-linecap="round" opacity="${op}"${d}/>`;
+  }
+  function gBounds() {
+    const span = 2 * GA.H;
+    const segW = (span - GA.GAP * (GA.N - 1)) / GA.N;
+    const out = [];
+    for (let i = 0; i < GA.N; i++) {
+      const s = -GA.H + i * (segW + GA.GAP);
+      out.push([s, s + segW, (2 * s + segW) / 2]);
+    }
+    return out;
+  }
+  function gSwirl(col, op) {
+    return `<g class="aw-swirl" opacity="${op}" fill="none" stroke="${col}" stroke-linecap="round" stroke-width="2.6"><path d="M45 64 H63 a3.8 3.8 0 1 0 -3.5 -3.8"/><path d="M43 71 H60 a4 4 0 1 1 -3.7 4"/></g>`;
+  }
+  function gNeedle(deg) {
+    const [nx, ny] = gpt(GA.R - 7, deg);
+    return `<path class="aw-needle" d="M${GA.CX} ${GA.CY} L${gf(nx)} ${gf(ny)}" stroke="${SLATE}" stroke-width="3.6" stroke-linecap="round"/>`;
+  }
+  // band: 1..6 → active band; null → unknown (resting, no needle).
+  function awGauge(band) {
+    const B = gBounds();
+    if (!band) {
+      return `<svg class="aw-gauge" viewBox="0 0 120 92" xmlns="http://www.w3.org/2000/svg">${
+        gArc(-GA.H, GA.H, UNKNOWN_COLOUR, GA.W, 0.9, '1.5 5')
+      }${gSwirl(UNKNOWN_COLOUR, 0.22)
+      }<circle cx="60" cy="60" r="4.5" fill="var(--aw-cloud,#fff)" stroke="${UNKNOWN_COLOUR}" stroke-width="2"/></svg>`;
+    }
+    const ai = band - 1;
+    const col = EAQI_PALETTE[band].colour;
+    const segs = B.map((b, i) =>
+      gArc(b[0], b[1], EAQI_PALETTE[i + 1].colour, i === ai ? GA.W + 3 : GA.W, 1)).join('');
+    return `<svg class="aw-gauge" viewBox="0 0 120 92" xmlns="http://www.w3.org/2000/svg">${
+      segs}${gSwirl(col, 0.3)}${gNeedle(B[ai][2])
+    }<circle cx="60" cy="60" r="4.5" fill="${col}"/></svg>`;
+  }
+
   // ── CSS ──────────────────────────────────────────────────────────────
   const CARD_CSS = `
-    :host { display: block; }
+    :host {
+      /* Brand accent — air/atmosphere azure (the --pw-gold analog). */
+      --aw-sky: #2E7DD1; --aw-sky-light: #8FC7F0; --aw-sky-deep: #1F5C9E;
+      /* Neutrals — theme-aware, with the PollenWatch paper palette as fallback. */
+      --aw-ink: var(--primary-text-color, #2A3540);
+      --aw-muted: var(--secondary-text-color, #7C8794);
+      --aw-cloud: var(--ha-card-background, var(--card-background-color, #FFFFFF));
+      --aw-edge: var(--divider-color, #ECE4D6);
+      --aw-hover: var(--secondary-background-color, rgba(0,0,0,0.04));
+      /* EEA 6-band severity ramp — science-anchored, NEVER theme-shifted. */
+      --aw-eaqi-1: #50f0e6; --aw-eaqi-2: #50ccaa; --aw-eaqi-3: #f0e641;
+      --aw-eaqi-4: #ff5050; --aw-eaqi-5: #960032; --aw-eaqi-6: #7d2181;
+      /* Per-glyph tint (color-neutral SVGs read these). */
+      --aw-grain-stroke: var(--aw-ink);
+      --aw-grain-fill: var(--aw-edge);
+      /* Type — Bricolage display / Hanken text, with safe system fallbacks. */
+      --aw-font-display: "Bricolage Grotesque", var(--ha-card-header-font-family, system-ui), sans-serif;
+      --aw-font-text: "Hanken Grotesk", var(--primary-font-family, system-ui), sans-serif;
+      --aw-r-card: var(--ha-card-border-radius, 16px);
+      --aw-r-pill: 999px;
+      display: block;
+    }
     .card {
-      background: var(--ha-card-background, var(--card-background-color, white));
-      border: 1px solid var(--divider-color, #ECE4D6);
-      border-radius: var(--ha-card-border-radius, 16px);
-      padding: 16px;
-      color: var(--primary-text-color, #2A3540);
+      background: var(--aw-cloud);
+      border: 1px solid var(--aw-edge);
+      border-radius: var(--aw-r-card);
+      padding: 16px 18px 14px;
+      color: var(--aw-ink);
       box-shadow: var(--ha-card-box-shadow, none);
+      font-family: var(--aw-font-text);
     }
-    .header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
-    .title { font-weight: 600; font-size: 18px; letter-spacing: -0.015em; }
-    .meta { margin-left: auto; display: flex; align-items: baseline; gap: 8px; }
+
+    /* ── header: mark · title · meta ── */
+    .header { display: flex; align-items: center; gap: 12px; }
+    .mark { width: 40px; height: 40px; flex-shrink: 0; }
+    .mark svg { width: 100%; height: 100%; display: block; }
+    .titles { min-width: 0; }
+    .title {
+      font-family: var(--aw-font-display); font-weight: 600; font-size: 18px;
+      letter-spacing: -0.015em; line-height: 1.15;
+    }
+    .submeta { font-size: 12.5px; color: var(--aw-muted); margin-top: 1px; }
+    .meta { margin-left: auto; display: flex; align-items: center; }
     .badge {
-      font-variant-numeric: tabular-nums; font-weight: 600; font-size: 13px;
-      color: var(--primary-text-color, #2A3540);
-      padding: 1px 6px; border-radius: 4px;
-      background: var(--divider-color, #ECE4D6);
+      font-family: var(--aw-font-text); font-variant-numeric: tabular-nums;
+      font-weight: 600; font-size: 12.5px; color: var(--aw-ink);
+      padding: 3px 9px; border-radius: var(--aw-r-pill);
+      background: var(--aw-edge);
     }
 
-    /* Headline — the dominant revised-EEA severity, big and colour-ramped. */
-    .headline {
-      display: flex; align-items: center; gap: 14px;
-      border-radius: 12px; padding: 14px 16px; margin-bottom: 14px;
+    /* ── hero: gauge + reading ── */
+    .hero {
+      display: flex; flex-direction: column; align-items: center;
+      padding: 12px 0 8px; margin-top: 8px;
+      border-top: 1px solid var(--aw-edge);
     }
-    .headline .chip {
-      flex-shrink: 0; min-width: 64px; text-align: center;
-      font-weight: 700; font-size: 15px; letter-spacing: -0.01em;
-      padding: 10px 12px; border-radius: 10px;
+    .gauge-wrap { width: 208px; max-width: 70%; }
+    .aw-gauge { width: 100%; height: auto; display: block; }
+    .aw-needle, .hub { transition: opacity 200ms; }
+    .reading { text-align: center; margin-top: 2px; }
+    .reading .level {
+      font-family: var(--aw-font-display); font-weight: 700; font-size: 30px;
+      line-height: 1; letter-spacing: -0.02em; transition: color 200ms;
     }
-    .headline .info { line-height: 1.3; }
-    .headline .level { font-weight: 700; font-size: 22px; letter-spacing: -0.02em; }
-    .headline .driver { color: var(--secondary-text-color, #7C8794); font-size: 12.5px; margin-top: 2px; }
-    .headline.state-unknown { background: var(--secondary-background-color, rgba(0,0,0,0.04)); }
-    .headline.state-unknown .chip { background: var(--divider-color, #ECE4D6); color: var(--secondary-text-color, #7C8794); }
+    .reading .cap {
+      font-size: 12px; color: var(--aw-muted); letter-spacing: 0.06em;
+      text-transform: uppercase; margin-top: 7px;
+    }
 
-    /* Pollutant rows */
-    .rows { display: flex; flex-direction: column; gap: 2px; }
+    /* ── rows ── */
+    .rows { display: flex; flex-direction: column; gap: 1px; margin-top: 8px; }
     .row {
-      display: block; width: 100%; text-align: left;
+      display: block; width: 100%; text-align: left; padding: 0;
       background: transparent; border: none; color: inherit; font: inherit;
-      border-radius: 8px; padding: 0; cursor: pointer;
+      border-radius: 12px; cursor: pointer;
     }
     .row-head {
       display: grid;
-      grid-template-columns: 14px minmax(64px, 1.2fr) auto auto 16px;
-      align-items: center; gap: 10px;
-      padding: 8px 8px; border-radius: 8px;
+      grid-template-columns: 30px minmax(72px, 1.3fr) auto auto 14px;
+      align-items: center; gap: 11px; padding: 8px 10px; border-radius: 12px;
     }
     .row:hover .row-head, .row:focus-visible .row-head {
-      background: var(--secondary-background-color, rgba(0,0,0,0.04));
-      outline: none;
+      background: var(--aw-hover); outline: none;
     }
-    .swatch { width: 14px; height: 14px; border-radius: 4px; flex-shrink: 0; background: ${UNKNOWN_COLOUR}; }
-    .p-name { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .p-name .formula { color: var(--secondary-text-color, #7C8794); font-weight: 500; margin-left: 6px; font-size: 12.5px; }
-    .p-reading { font-variant-numeric: tabular-nums; font-size: 14px; white-space: nowrap; text-align: right; }
-    .p-reading .unit { color: var(--secondary-text-color, #7C8794); font-size: 12px; margin-left: 3px; }
-    .p-band {
-      font-size: 12px; font-weight: 600; white-space: nowrap;
-      padding: 2px 8px; border-radius: 999px; text-align: center;
+    .glyph {
+      width: 30px; height: 30px; flex-shrink: 0;
+      display: inline-flex; align-items: center; justify-content: center;
     }
-    .p-band.unknown { background: var(--divider-color, #ECE4D6); color: var(--secondary-text-color, #7C8794); }
-    .diverge-flag { font-size: 11px; color: var(--warning-color, #C77700); margin-left: 6px; font-weight: 600; }
-    .chev { color: var(--secondary-text-color, #7C8794); transition: transform 160ms; justify-self: end; font-size: 12px; }
+    .glyph svg { width: 100%; height: 100%; display: block; }
+    .p-name {
+      font-weight: 600; font-size: 14.5px; white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis;
+    }
+    .p-name .formula { color: var(--aw-muted); font-weight: 500; margin-left: 6px; font-size: 12.5px; }
+    .diverge-flag { color: var(--warning-color, #C77700); margin-left: 6px; font-weight: 600; font-size: 11px; }
+    .p-reading {
+      font-variant-numeric: tabular-nums; font-size: 14px; white-space: nowrap;
+      text-align: right; color: var(--aw-ink);
+    }
+    .p-reading .unit { color: var(--aw-muted); font-size: 12px; margin-left: 3px; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 5px 12px 5px 10px; border-radius: var(--aw-r-pill);
+      font-family: var(--aw-font-text); font-weight: 600; font-size: 12px;
+      white-space: nowrap;
+    }
+    .pill .pdot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+    .pill.unknown {
+      background: transparent; border: 1px dashed var(--aw-edge); color: var(--aw-muted);
+    }
+    .chev {
+      color: var(--aw-muted); justify-self: end; font-size: 12px;
+      transition: transform 160ms;
+    }
     .row[aria-expanded="true"] .chev { transform: rotate(90deg); }
 
-    /* Expanded provenance / consensus */
-    .detail { display: none; padding: 4px 10px 12px 38px; }
+    /* ── expanded provenance / consensus ── */
+    .detail { display: none; padding: 2px 12px 12px 41px; }
     .row[aria-expanded="true"] + .detail { display: block; }
-    .detail-block { margin-top: 10px; }
-    .detail-block:first-child { margin-top: 2px; }
+    .detail-block { margin-top: 12px; }
+    .detail-block:first-child { margin-top: 4px; }
     .detail-h {
+      font-family: var(--aw-font-display); font-weight: 600;
       font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
-      color: var(--secondary-text-color, #7C8794); font-weight: 600; margin-bottom: 5px;
+      color: var(--aw-muted); margin-bottom: 6px;
     }
     .src-row { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 2px 0; }
     .src-dot { width: 9px; height: 9px; border-radius: 999px; flex-shrink: 0; background: ${UNKNOWN_COLOUR}; }
     .src-label { font-weight: 500; }
-    .src-value { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--secondary-text-color, #7C8794); }
-    .src-station { color: var(--secondary-text-color, #7C8794); font-size: 11px; font-style: italic; }
-    .consensus-verdict { font-size: 12.5px; margin-top: 4px; }
+    .src-value { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--aw-muted); }
+    .src-station { color: var(--aw-muted); font-size: 11px; font-style: italic; }
+    .consensus-verdict { font-size: 12.5px; margin-top: 5px; }
     .consensus-verdict.mixed { color: var(--warning-color, #C77700); font-weight: 600; }
     .auth-row { font-size: 12.5px; padding: 3px 0; display: flex; gap: 8px; align-items: baseline; }
-    .auth-name { color: var(--secondary-text-color, #7C8794); min-width: 92px; flex-shrink: 0; }
-    .auth-body { line-height: 1.45; }
+    .auth-name { color: var(--aw-muted); min-width: 96px; flex-shrink: 0; }
+    .auth-body { line-height: 1.5; }
     .exceeds { color: var(--error-color, #D33A2C); font-weight: 600; }
     .within { color: var(--success-color, #2E8B57); font-weight: 600; }
-    .it-targets { color: var(--secondary-text-color, #7C8794); font-size: 11.5px; }
+    .it-targets { color: var(--aw-muted); font-size: 11.5px; }
     .basis-note {
-      font-size: 12.5px; margin-bottom: 6px; padding: 6px 8px;
-      background: var(--secondary-background-color, rgba(0,0,0,0.03));
-      border-radius: 6px; line-height: 1.4;
+      font-size: 12.5px; margin-bottom: 6px; padding: 7px 9px;
+      background: var(--aw-hover); border-radius: 8px; line-height: 1.45;
     }
-    .basis-note.differ { border-left: 3px solid var(--warning-color, #C77700); }
+    .basis-note.differ { border-left: 3px solid var(--aw-sky); }
 
-    .footer { margin-top: 12px; display: flex; align-items: center; }
+    /* ── footer ── */
+    .footer { margin-top: 12px; display: flex; justify-content: center; }
     .toggle-all {
-      background: transparent; border: none; color: var(--secondary-text-color, #7C8794);
-      cursor: pointer; font: inherit; font-size: 11px; letter-spacing: 0.08em;
-      text-transform: uppercase; padding: 4px 6px;
+      font-family: var(--aw-font-text); font-weight: 600; font-size: 11px;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--aw-muted); background: transparent;
+      border: 1px solid var(--aw-edge); border-radius: var(--aw-r-pill);
+      padding: 6px 14px; cursor: pointer;
     }
-    .toggle-all:hover { color: var(--primary-text-color, #2A3540); }
-    .empty { padding: 18px; text-align: center; color: var(--secondary-text-color, #7C8794); font-size: 13px; }
+    .toggle-all:hover { color: var(--aw-ink); border-color: var(--aw-muted); }
+    .empty { padding: 18px; text-align: center; color: var(--aw-muted); font-size: 13px; }
 
-    @media (prefers-reduced-motion: reduce) { .chev { transition: none !important; } }
+    @media (prefers-reduced-motion: reduce) {
+      .chev, .aw-needle, .reading .level { transition: none !important; }
+    }
   `;
 
   // ── Card element ─────────────────────────────────────────────────────
@@ -367,7 +516,11 @@
     constructor() {
       super();
       this.attachShadow({ mode: 'open' });
-      this._expanded = new Set();   // pollutant keys currently expanded
+      this._expanded = new Set();
+    }
+
+    connectedCallback() {
+      ensureFonts();
     }
 
     setConfig(config) {
@@ -392,6 +545,7 @@
       this._discoveredPollutants = null;
       this._discoveryPromise = null;
       this._built = false;
+      ensureFonts();
       this._build();
     }
 
@@ -404,7 +558,7 @@
 
     getCardSize() {
       const n = this._resolvePollutantKeys().length || 4;
-      return 2 + n;
+      return 4 + n;
     }
 
     static getStubConfig() {
@@ -415,14 +569,11 @@
       return document.createElement('airwatch-card-editor');
     }
 
-    // Pollutant list: explicit YAML > WS-discovered selection > hass.states
-    // scan. Mirrors PollenWatch's layered species resolution.
     _resolvePollutantKeys() {
       let keys;
       if (this._config?._explicitPollutants) keys = this._config._explicitPollutants.slice();
       else if (this._discoveredPollutants) keys = this._discoveredPollutants.slice();
       else keys = this._scanPollutants();
-      // Stable, human-sensible order.
       const orderIdx = (k) => {
         const i = POLLUTANT_ORDER.indexOf(k);
         return i === -1 ? POLLUTANT_ORDER.length : i;
@@ -444,8 +595,6 @@
       return out;
     }
 
-    // One-shot WS discovery of the entry's selected_pollutants. Silent on
-    // failure — the scan fallback covers older integrations / transient errors.
     async _ensureDiscovery() {
       if (this._discoveryPromise) return this._discoveryPromise;
       if (!this._hass?.callWS) {
@@ -465,9 +614,7 @@
             this._discoveredPollutants = result.selected_pollutants.slice();
             if (this._built) this._render();
           }
-        } catch (_e) {
-          // Endpoint absent / errored — fall back to scan. Deliberately silent.
-        }
+        } catch (_e) { /* fall back to scan — deliberately silent. */ }
       })();
       return this._discoveryPromise;
     }
@@ -477,10 +624,17 @@
         <style>${CARD_CSS}</style>
         <ha-card class="card" data-card>
           <div class="header">
-            <span class="title" data-title></span>
+            <span class="mark">${AW_MARK}</span>
+            <div class="titles">
+              <div class="title" data-title></div>
+              <div class="submeta" data-submeta></div>
+            </div>
             <span class="meta"><span class="badge" data-badge></span></span>
           </div>
-          <div class="headline" data-headline></div>
+          <div class="hero" data-hero>
+            <div class="gauge-wrap" data-gauge></div>
+            <div class="reading" data-reading></div>
+          </div>
           <div class="rows" data-rows></div>
           <div class="footer">
             <button class="toggle-all" data-toggle-all aria-pressed="false"></button>
@@ -489,8 +643,6 @@
       `;
       this.shadowRoot.querySelector('[data-title]').textContent = this._config.title;
 
-      // Row expand/collapse via event delegation (rows are re-rendered on every
-      // state push; delegating keeps a single stable listener).
       const rowsEl = this.shadowRoot.querySelector('[data-rows]');
       rowsEl.addEventListener('click', (e) => {
         const row = e.target.closest('.row[data-pollutant]');
@@ -527,20 +679,22 @@
       if (!this._hass || !this._built) return;
       const keys = this._resolvePollutantKeys();
       const rowsEl = this.shadowRoot.querySelector('[data-rows]');
-      const headlineEl = this.shadowRoot.querySelector('[data-headline]');
+      const heroEl = this.shadowRoot.querySelector('[data-hero]');
       const badgeEl = this.shadowRoot.querySelector('[data-badge]');
+      const submetaEl = this.shadowRoot.querySelector('[data-submeta]');
       const toggleAll = this.shadowRoot.querySelector('[data-toggle-all]');
 
       if (keys.length === 0) {
-        headlineEl.style.display = 'none';
+        heroEl.style.display = 'none';
         badgeEl.textContent = '';
+        submetaEl.textContent = '';
         rowsEl.innerHTML = `<div class="empty">No AirWatch pollutants found yet.</div>`;
         toggleAll.style.display = 'none';
         return;
       }
+      heroEl.style.display = '';
       toggleAll.style.display = '';
 
-      // First render with expand_default: open every row once.
       if (this._expandedDefault && !this._appliedDefault) {
         this._expanded = new Set(keys);
         this._appliedDefault = true;
@@ -549,35 +703,34 @@
       const rows = keys.map((k) =>
         resolvePollutant(this._hass, k, this._config._sourceFilter));
 
-      // Headline: worst revised-EEA sub-index across the 5 concentration
-      // pollutants (the EAQI = worst sub-index by definition).
-      this._renderHeadline(headlineEl, rows);
+      this._renderHero(heroEl, rows);
 
-      // Card-level n/m badge: the best cross-validation available across rows.
+      // Card-level n/m badge + "N sources" submeta.
       const counts = rows
         .map((r) => r.consensus?.attributes)
         .filter(Boolean)
-        .map((a) => ({
-          c: a.source_count ?? 0, m: a.max_possible_sources ?? 0,
-        }));
+        .map((a) => ({ c: a.source_count ?? 0, m: a.max_possible_sources ?? 0 }));
       if (counts.length) {
         const c = Math.max(...counts.map((x) => x.c));
         const m = Math.max(...counts.map((x) => x.m));
-        badgeEl.textContent = m > 0 ? `${c}/${m} sources` : '';
+        badgeEl.textContent = m > 0 ? `${c}/${m}` : '';
+        submetaEl.textContent = m > 0
+          ? `${c} of ${m} ${m === 1 ? 'source' : 'sources'} reporting`
+          : '';
       } else {
         badgeEl.textContent = '';
+        submetaEl.textContent = '';
       }
 
       rowsEl.innerHTML = rows.map((r) => this._renderRow(r)).join('');
+      this._inlineGlyphs(rowsEl);
 
-      // Toggle-all label reflects the current aggregate state.
       const allOpen = keys.every((k) => this._expanded.has(k));
       toggleAll.textContent = allOpen ? 'Hide provenance' : 'Show provenance';
       toggleAll.setAttribute('aria-pressed', String(allOpen));
     }
 
-    _renderHeadline(el, rows) {
-      el.style.display = '';
+    _renderHero(el, rows) {
       // Worst revised sub-index among the EAQI-defining pollutants.
       let worst = null;
       for (const r of rows) {
@@ -586,40 +739,38 @@
         if (!sev || sev.band == null) continue;
         if (!worst || sev.band > worst.sev.band) worst = { r, sev };
       }
+      const gaugeEl = el.querySelector('[data-gauge]');
+      const readingEl = el.querySelector('[data-reading]');
       if (!worst) {
-        // No EAQI sub-index reading — fail-safe unknown headline (the data
-        // layer's stale/all-invalid state surfaces here, not a fake green).
-        el.className = 'headline state-unknown';
-        el.innerHTML = `
-          <span class="chip">—</span>
-          <span class="info">
-            <span class="level">Unknown</span>
-            <span class="driver">No current air-quality index reading</span>
-          </span>`;
+        // Fail-safe: no EAQI sub-index reading → resting/unknown gauge, never
+        // a fake green.
+        gaugeEl.innerHTML = awGauge(null);
+        readingEl.innerHTML =
+          `<div class="level" style="color:var(--aw-muted)">Unknown</div>` +
+          `<div class="cap">No current air-quality index reading</div>`;
         return;
       }
       const { r, sev } = worst;
-      const fg = textOn(sev.colour);
-      el.className = 'headline';
-      el.innerHTML = `
-        <span class="chip" style="background:${sev.colour};color:${fg}">${this._esc(sev.label)}</span>
-        <span class="info">
-          <span class="level">${this._esc(sev.label)}</span>
-          <span class="driver">Worst sub-index: ${this._esc(r.formula)} · revised EEA index</span>
-        </span>`;
+      gaugeEl.innerHTML = awGauge(sev.band);
+      readingEl.innerHTML =
+        `<div class="level" style="color:${sev.colour}">${this._esc(sev.label)}</div>` +
+        `<div class="cap">Overall · worst sub-index ${this._esc(r.formula)}</div>`;
     }
 
     _renderRow(r) {
       const expanded = this._expanded.has(r.pollutant);
       const sev = r.severity;
-      const swatchColour = sev?.colour || UNKNOWN_COLOUR;
 
-      let bandChip;
+      // Pill — band colour bg + contrast-aware text/dot, or a dashed outline
+      // pill for unknown.
+      let pill;
       if (r.state === 'unknown' || !sev) {
-        bandChip = `<span class="p-band unknown">Unknown</span>`;
+        pill = `<span class="pill unknown">Unknown</span>`;
       } else {
         const fg = textOn(sev.colour);
-        bandChip = `<span class="p-band" style="background:${sev.colour};color:${fg}">${this._esc(sev.label)}</span>`;
+        const dot = fg === '#ffffff' ? 'rgba(255,255,255,0.92)' : 'rgba(0,0,0,0.45)';
+        pill = `<span class="pill" style="background:${sev.colour};color:${fg}">` +
+          `<span class="pdot" style="background:${dot}"></span>${this._esc(sev.label)}</span>`;
       }
 
       const reading = r.state === 'unknown'
@@ -627,17 +778,26 @@
         : `<span class="p-reading">${this._esc(fmtReading(r.reading))}<span class="unit">${this._esc(r.unit)}</span></span>`;
 
       const diverged = r.divergence && r.divergence.state === 'on';
-      const divergeFlag = diverged ? `<span class="diverge-flag">⚠ sources differ</span>` : '';
+      const divergeFlag = diverged ? `<span class="diverge-flag">⚠ differ</span>` : '';
+
+      // Glyph holder — color-neutral SVG inlined after render; a faint
+      // severity wash tints the fill while the outline stays legible.
+      const hasGlyph = GLYPH_KEYS.has(r.pollutant);
+      const glyphTint = (sev && r.state !== 'unknown')
+        ? ` style="--aw-grain-fill:${sev.colour}33"` : '';
+      const glyph = hasGlyph
+        ? `<span class="glyph" data-glyph="${this._esc(r.pollutant)}"${glyphTint} aria-hidden="true"></span>`
+        : `<span class="glyph" aria-hidden="true"></span>`;
 
       return `
         <button class="row" data-pollutant="${this._esc(r.pollutant)}"
                 aria-expanded="${expanded}"
                 aria-label="${this._esc(r.name)} — ${this._esc(sev?.label || 'unknown')}">
           <span class="row-head">
-            <span class="swatch" style="background:${swatchColour}"></span>
+            ${glyph}
             <span class="p-name">${this._esc(r.name)}<span class="formula">${this._esc(r.formula)}</span>${divergeFlag}</span>
             ${reading}
-            ${bandChip}
+            ${pill}
             <span class="chev">▸</span>
           </span>
         </button>
@@ -645,12 +805,18 @@
       `;
     }
 
-    // The depth: consensus breakdown + multi-authority provenance. Only built
-    // for an expanded row (keeps the DOM cheap when collapsed).
+    _inlineGlyphs(rowsEl) {
+      rowsEl.querySelectorAll('[data-glyph]').forEach((holder) => {
+        const key = holder.getAttribute('data-glyph');
+        loadGlyph(key).then((svg) => {
+          if (svg && holder.isConnected) holder.innerHTML = svg;
+        });
+      });
+    }
+
     _renderDetail(r) {
       const parts = [];
 
-      // 1. Cross-source consensus (the project's whole point — opt-in).
       const cv = consensusView(this._hass, r.pollutant, r.consensus);
       if (cv) {
         const srcRows = cv.rows.map((s) => {
@@ -679,11 +845,9 @@
         </div>`);
       }
 
-      // 2. Index basis — surface the classic-vs-revised divergence explicitly.
       const basisNote = this._indexBasisNote(r);
       if (basisNote) parts.push(basisNote);
 
-      // 3. Authority provenance — WHO / EU per averaging window.
       const auth = this._renderAuthorities(r);
       if (auth) parts.push(auth);
 
@@ -725,8 +889,6 @@
       const b = r.bands;
       if (!b) return null;
       const blocks = [];
-      // WHO 2021 + retained, then EU in-force. Each entry is one averaging
-      // window; `exceeds` is a real comparison done server-side.
       for (const key of ['who_2021', 'who_retained', 'eu_2024_2881']) {
         const list = b[key];
         if (!Array.isArray(list) || list.length === 0) continue;
@@ -747,8 +909,7 @@
       const verdict = e.exceeds
         ? `<span class="exceeds">exceeds</span>`
         : `<span class="within">within</span>`;
-      const unit = ' µg/m³';
-      let line = `${this._esc(e.averaging)}: ${this._esc(String(e.value))}${unit} — ${verdict}`;
+      let line = `${this._esc(e.averaging)}: ${this._esc(String(e.value))} µg/m³ — ${verdict}`;
       if (authority === 'eu_2024_2881' && e.attain_by) {
         line += ` <span class="it-targets">(${this._esc(e.kind || 'limit')}, by ${this._esc(String(e.attain_by))})</span>`;
       }
@@ -766,9 +927,6 @@
   }
 
   // ── Minimal config editor (ha-form) ──────────────────────────────────
-  // A light visual editor so the card configures from the UI; YAML config is
-  // fully documented and works without it. Degrades cleanly if ha-form is not
-  // available in the running frontend (the YAML editor still applies).
   class AirWatchCardEditor extends HTMLElement {
     setConfig(config) {
       this._config = { ...config };
@@ -842,13 +1000,12 @@
     customElements.define('airwatch-card-editor', AirWatchCardEditor);
   }
 
-  // Register with HA's custom-card catalog so it shows in the card picker.
   window.customCards = window.customCards || [];
   if (!window.customCards.some((c) => c.type === 'airwatch-card')) {
     window.customCards.push({
       type: 'airwatch-card',
       name: 'AirWatch',
-      description: 'Multi-source air quality — official EEA severity at a glance, '
+      description: 'Multi-source air quality — the official EEA severity gauge at a glance, '
         + 'multi-authority provenance (WHO / EU) and cross-source consensus on tap.',
       preview: false,
       documentationURL: 'https://github.com/TheDave94/airwatch',
@@ -858,7 +1015,7 @@
   /* eslint-disable no-console */
   console.info(
     `%c airwatch-card %c v${CARD_VERSION} `,
-    'background:#50ccaa;color:#10241f;font-weight:600;padding:2px 6px;border-radius:3px 0 0 3px;',
+    'background:#2E7DD1;color:#EAF2FB;font-weight:600;padding:2px 6px;border-radius:3px 0 0 3px;',
     'background:#2A3540;color:#EAF2F0;padding:2px 6px;border-radius:0 3px 3px 0;'
   );
 })();
