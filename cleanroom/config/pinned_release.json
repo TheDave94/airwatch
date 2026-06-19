@@ -1,17 +1,17 @@
 {
-  "_doc": "The baseline airwatch version the cleanroom test installs FIRST, before upgrading to HEAD. AirWatch has NO released tag yet — the cleanroom harness cannot run end-to-end until v1 ships and a real tag is seeded here. The placeholder below documents the shape; replace default_baseline + the versions entry with the first real release tag (the version of record) once it exists.",
+  "_doc": "The baseline airwatch version the cleanroom test installs FIRST, before upgrading to HEAD. Default is v1.0.0 — the first release (config-entry VERSION=1, single-step config-flow, pollutant field 'selected_pollutants'). The no-loss gate only holds WITHIN the same schema generation, so the baseline must stay on the latest release of the current generation. Override with --baseline <tag> for smoke runs or future baselines.",
 
-  "default_baseline": "TBD",
+  "default_baseline": "v1.0.0",
 
   "versions": {
-    "TBD": {
+    "v1.0.0": {
       "flow_version": 1,
       "pollutant_field": "selected_pollutants",
-      "notes": "PLACEHOLDER. AirWatch's config-entry VERSION=1, single-step config-flow, pollutant field 'selected_pollutants'. Replace this key with the first released git tag (e.g. v1.0.0) before running the harness; bootstrap errors loudly on an unknown baseline."
+      "notes": "First release. config-entry VERSION=1, single-step config-flow (ha_flow.py drives single-step for flow_version <= 1), unified pollutant key 'selected_pollutants'. NOTE: 'flow_version' here is the config-FLOW SHAPE the cleanroom harness drives (single-step for v1, two-step reserved for any future VERSION that splits the flow) — NOT the config-entry storage VERSION. First release of the current schema generation — the correct cleanroom baseline going forward."
     }
   },
 
   "head_flow_version": 1,
 
-  "_when_to_update": "Seed the first real tag under 'versions' (and set 'default_baseline' to it) once v1 is released. Add a new entry when a later release changes its flow VERSION or pollutant field. Bootstrap errors loudly on unknown baseline tag."
+  "_when_to_update": "Add a new entry under 'versions' when a new release is tagged AND its flow VERSION or pollutant field changed. Bootstrap errors loudly on unknown baseline tag. Keep 'default_baseline' on the latest release of the CURRENT schema generation; only bump it across another deliberate breaking schema change."
 }
