@@ -384,7 +384,12 @@
        it matches the user's theme — we add only padding + internal layout.
        Identity lives in the CONTENT (EEA gauge, ramp, glyphs, accent), not the
        chrome. */
-    .card { padding: 16px 18px 14px; }
+    /* Base text colour comes from the theme (--primary-text-color, via
+       --aw-ink) so every element that doesn't set its own colour inherits a
+       legible, theme-derived value on ANY background — custom properties
+       inherit through the shadow boundary, so this resolves to the user's
+       theme even though the card is in a shadow root. */
+    .card { padding: 16px 18px 14px; color: var(--aw-ink); }
 
     /* ── header: mark · title · meta ── */
     .header { display: flex; align-items: center; gap: 14px; }
@@ -440,22 +445,30 @@
       background: transparent; border: none; color: inherit; font: inherit;
       border-radius: 12px; cursor: pointer;
     }
+    /* Flex row that WRAPS: the name keeps a readable basis (never shrinks below
+       it), and the reading+pill cluster drops to a second line when the row is
+       too narrow — instead of crushing the name. Names wrap at word boundaries,
+       never per-character, and never truncate. */
     .row-head {
-      display: grid;
-      grid-template-columns: 30px minmax(72px, 1.3fr) auto auto 14px;
-      align-items: center; gap: 11px; padding: 8px 10px; border-radius: 12px;
+      display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px;
+      padding: 8px 10px; border-radius: 12px;
     }
     .row:hover .row-head, .row:focus-visible .row-head {
       background: var(--aw-hover); outline: none;
     }
     .glyph {
-      width: 30px; height: 30px; flex-shrink: 0;
+      width: 30px; height: 30px; flex: 0 0 30px;
       display: inline-flex; align-items: center; justify-content: center;
     }
     .glyph svg { width: 100%; height: 100%; display: block; }
     .p-name {
-      font-weight: 600; font-size: 14.5px; white-space: nowrap;
-      overflow: hidden; text-overflow: ellipsis;
+      flex: 1 1 130px; min-width: 0;
+      font-weight: 600; font-size: 14.5px; line-height: 1.25;
+      overflow-wrap: break-word;
+    }
+    .row-right {
+      margin-left: auto; flex: 0 0 auto;
+      display: inline-flex; align-items: center; gap: 10px;
     }
     .p-name .formula { color: var(--aw-muted); font-weight: 500; margin-left: 6px; font-size: 12.5px; }
     .diverge-flag { color: var(--warning-color, #C77700); margin-left: 6px; font-weight: 600; font-size: 11px; }
@@ -482,9 +495,9 @@
 
     /* ── expanded provenance / consensus ──
        Left padding aligns the detail to the row's NAME column (row-head
-       padding-left 10 + glyph 30 + gap 11 = 51), so the callout sits on the
+       padding-left 10 + glyph 30 + gap 10 = 50), so the callout sits on the
        same vertical grid line as the pollutant names above/below. */
-    .detail { display: none; padding: 2px 10px 14px 51px; }
+    .detail { display: none; padding: 2px 10px 14px 50px; }
     .row[aria-expanded="true"] + .detail { display: block; }
     .detail-block { margin-top: 12px; }
     .detail-block:first-child { margin-top: 4px; }
@@ -833,9 +846,11 @@
           <span class="row-head">
             ${glyph}
             <span class="p-name">${this._esc(r.name)}<span class="formula">${this._esc(r.formula)}</span>${divergeFlag}</span>
-            ${reading}
-            ${pill}
-            <span class="chev">▸</span>
+            <span class="row-right">
+              ${reading}
+              ${pill}
+              <span class="chev">▸</span>
+            </span>
           </span>
         </button>
         <div class="detail">${expanded ? this._renderDetail(r) : ''}</div>
