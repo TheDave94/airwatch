@@ -490,8 +490,9 @@ def eaqi_band_for(pollutant: str, value: float | None) -> int | None:
     For ``european_aqi`` the index value itself is banded (0–20 good …). For a
     concentration pollutant its µg/m³ value is banded by the classic bounds.
     Returns ``None`` for CO (not in the EAQI) or an unknown/missing value. This is
-    the operational scale (consensus + ``european_aqi`` agreement) — use
-    :func:`index_band_for` for the revised index.
+    the **classic** scale — retained for provenance/display and for the
+    ``european_aqi`` index value. Operational *severity* (``level_for_value``) is
+    driven by the revised index (:data:`EAQI_REVISED`), not this function.
     """
     if pollutant == "european_aqi":
         return _band_index_for_bounds(_EAQI_INDEX_BOUNDS, value)
@@ -519,21 +520,36 @@ def eaqi_band_colour(band: int | None) -> str | None:
     return entry[1] if entry else None
 
 
-# EAQI 6-band → common 3-level consensus scale (operational alignment, mirrors
-# PollenWatch's index collapse). Good/Fair → 0 (none); Moderate/Poor → 1
-# (elevated); Very poor/Extremely poor → 2 (high). The health-conservative
-# take-the-higher bias lives once in analytics.consensus, not here.
+# EAQI 6-band → common 3-level severity scale (mirrors PollenWatch's index
+# collapse). Good/Fair → 0 (none); Moderate/Poor → 1 (elevated); Very poor/
+# Extremely poor → 2 (high). The band *names* are identical between the classic
+# and revised EEA indexes, so the same collapse applies to either. The
+# health-conservative take-the-higher bias lives once in analytics.consensus.
 _EAQI_BAND_TO_LEVEL: Final[dict[int, int]] = {1: 0, 2: 0, 3: 1, 4: 1, 5: 2, 6: 2}
 
-# CO has no EAQI band; bucket it on WHO 24h (4000) + EU 8h legal limit (10000).
+# CO is in NEITHER EAQI (classic or revised). Operational severity for CO is
+# therefore driven by WHO/EU directly: onset at the WHO 2021 24-hour AQG
+# (4 mg/m³ = 4000 µg/m³) → elevated; the WHO 8-hour guideline / EU 8-hour limit
+# (10 mg/m³ = 10000 µg/m³) → high. (WHO/EU-consistent, no invented bands.)
 _CO_LEVEL_BOUNDS: Final[tuple[float, float]] = (4000.0, 10000.0)
 
 
 def level_for_value(pollutant: str, value: float | None) -> int | None:
-    """Bucket a reading to the common 0/1/2 level for cross-source consensus.
+    """Bucket a reading to the common 0/1/2 severity level for consensus.
 
-    EAQI-banded pollutants collapse their 6 classic bands → 3 levels. CO (no EAQI
-    band) uses WHO 24h / EU 8h-limit bounds. Returns ``None`` for a missing value.
+    Operational severity follows the **2024 revised, WHO-aligned EEA index**
+    (:data:`EAQI_REVISED`) for the five concentration pollutants — the current
+    official, health-aligned index — collapsing its 6 bands → 3 levels. This is a
+    deliberate change from the classic EAQI scale (which is retained only for
+    provenance/display): in the common concentration range ratings are stricter.
+
+    Special cases:
+    - ``carbon_monoxide`` — not in either EAQI; uses the WHO/EU bounds above.
+    - ``european_aqi`` — this value *is* Open-Meteo's classic aggregate index, so
+      it is banded on its native 0–100 index scale (the only scale meaningful for
+      that number); the revised index defines no aggregate value.
+
+    Returns ``None`` for a missing value or a pollutant with no band mapping.
     """
     if value is None:
         return None
@@ -544,7 +560,10 @@ def level_for_value(pollutant: str, value: float | None) -> int | None:
         if value >= onset:
             return 1
         return 0
-    band = eaqi_band_for(pollutant, value)
+    if pollutant == "european_aqi":
+        band = eaqi_band_for("european_aqi", value)
+    else:
+        band = index_band_for(EAQI_REVISED, pollutant, value)
     if band is None:
         return None
     return _EAQI_BAND_TO_LEVEL[band]

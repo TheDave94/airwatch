@@ -56,31 +56,46 @@ Across sources, per pollutant:
 - **Divergence** (binary sensor) — flags when sources disagree by more than one
   level.
 
+> **Severity basis (changed):** the `good` / `elevated` / `high` severity level
+> behind consensus, divergence and each raw sensor's `level` is now computed on
+> the **2024 revised, WHO-aligned EEA index** (the current official, health-aligned
+> index) — *not* the classic EAQI scale. **Ratings are stricter than the classic
+> EAQI scale by design** in the common concentration range (the recalibration
+> lowers the Good/Fair cut-points to the WHO guidelines; note the upper bands span
+> wider ranges, so at very high concentrations the revised band can sit lower than
+> the classic one). Carbon monoxide isn't in either EAQI, so its severity is driven
+> directly by WHO/EU (onset at the WHO 24-hour AQG, high at the WHO 8-hour / EU
+> limit). `european_aqi` keeps its native classic-index meaning.
+
 ## Thresholds & provenance
 
 AirWatch **exposes the authority of every band rather than asserting a verdict**
-(the model inherited from PollenWatch's `threshold_status`). Two standards are
-carried, each tagged:
+(the model inherited from PollenWatch's `threshold_status`). Every value is traced
+to its primary source in [`THRESHOLDS.md`](THRESHOLDS.md). Each raw sensor carries
+a `bands` attribute keyed by **distinct authority**, never collapsed:
 
-- **WHO 2021 global air-quality guidelines** — the health overlay. Each raw
-  sensor surfaces whether the reading exceeds the WHO guideline *and the
-  guideline's averaging window* (24-hour / 8-hour / annual), so the fact that an
-  hourly reading is being compared to a longer-mean guideline is visible, not
-  hidden.
-- **European Air Quality Index (EAQI)** — the display / colour scale (6 bands,
-  Good → Extremely poor). AirWatch uses the *classic EEA / Open-Meteo*
-  breakpoints so a pollutant's band agrees with the `european_aqi` value on the
-  same fetch; the EEA's stricter 2023 revision is the tagged alternate.
-- **EU legal limit / target values** (Directive 2008/50/EC) — a tagged overlay
-  alongside WHO, kept **distinct** from it: a reading can exceed the WHO
-  guideline while remaining under the looser EU limit, and AirWatch shows both
-  rather than collapsing them into one verdict.
+- **WHO 2021 global air-quality guidelines** (`who_2021`) — the health overlay,
+  carried **in full**: the AQG level **and** the interim targets (IT-1…IT-n) for
+  **each** averaging window WHO defines per pollutant (annual / 24-hour / 8-hour /
+  peak-season), each citing its WHO-commissioned systematic-review DOI.
+- **WHO retained short-averaging values** (`who_retained`) — the 2000/2005
+  guidelines WHO 2021 states *remain valid* (NO₂ 1-h 200, SO₂ 10-min 500, CO
+  8-h/1-h/15-min). These are the genuinely **hour-comparable** WHO numbers, so the
+  averaging mismatch is resolved with real WHO science, not just a caveat.
+- **Classic EAQI** (`eaqi_classic`) — the index Open-Meteo's `european_aqi`
+  numerically returns; retained for provenance/display.
+- **Revised EEA index** (`eaqi_eea_2024`) — the 2024 WHO-aligned official index
+  (the **severity driver**, above). The divergence between what Open-Meteo's index
+  *says* and what the current official index says is itself surfaced as provenance.
+- **EU standards** — Directive **(EU) 2024/2881** (`eu_2024_2881`), in force, with
+  **both** statutory milestones (attain by 2026 ≈ the old values; by 2030
+  tightened toward WHO), each dated; the repealed **2008/50/EC** values are kept as
+  `eu_2008_50_ec` tagged `status: repealed` (history is provenance).
 
-Each raw sensor carries a `bands` attribute keyed by authority (`eaqi` /
-`who_2021` / `eu_limit`), every entry tagged with its **authority + value +
-averaging window**. (The US EPA AQI is a reserved authority — not populated in
-v1, as it needs per-pollutant ppb/ppm conversion and the piecewise AQI
-computation and is US-centric for an EU/CAMS integration.)
+Each `bands` entry is tagged with its **authority + value + averaging window**
+(WHO/EU authorities as a list of per-window entries). The US EPA AQI is a reserved
+authority — not populated in v1 (needs per-pollutant ppb/ppm conversion + the
+piecewise AQI computation, and is US-centric for an EU/CAMS integration).
 
 ### Carbon monoxide units
 
