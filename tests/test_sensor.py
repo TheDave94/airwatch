@@ -130,15 +130,22 @@ async def test_q4_pm25_bands_carry_all_three_authorities(
     pm = hass.states.get("sensor.airwatch_open_meteo_pm2_5")
     bands = pm.attributes["bands"]
     assert isinstance(bands, dict)
-    assert set(bands) == {"eaqi", "who_2021", "eu_limit"}
-    # Each authority carries its provenance triad.
-    assert "authority" in bands["eaqi"]
-    assert "averaging" in bands["eaqi"]
-    for key in ("who_2021", "eu_limit"):
+    # Classic + revised index, WHO 2021, and both EU milestones — distinct.
+    assert set(bands) == {
+        "eaqi_classic", "eaqi_eea_2024", "who_2021", "eu_2024_2881", "eu_2008_50_ec",
+    }
+    # Index authorities are single band dicts.
+    for key in ("eaqi_classic", "eaqi_eea_2024"):
         assert "authority" in bands[key]
         assert "averaging" in bands[key]
-        assert "value" in bands[key]
-        assert "exceeds" in bands[key]
+    # WHO/EU authorities are lists of per-averaging-window entries.
+    for key in ("who_2021", "eu_2024_2881", "eu_2008_50_ec"):
+        assert isinstance(bands[key], list) and bands[key]
+        for entry in bands[key]:
+            assert "authority" in entry
+            assert "averaging" in entry
+            assert "value" in entry
+            assert "exceeds" in entry
     # Normalised level + label are present.
     assert "level" in pm.attributes
     assert "level_label" in pm.attributes
@@ -151,9 +158,11 @@ async def test_q4_carbon_monoxide_bands_omit_eaqi(
     co = hass.states.get("sensor.airwatch_open_meteo_carbon_monoxide")
     bands = co.attributes["bands"]
     assert isinstance(bands, dict)
-    # CO is not part of the EAQI; it carries WHO + EU bands only.
-    assert "eaqi" not in bands
-    assert set(bands) == {"who_2021", "eu_limit"}
+    # CO is not part of either EAQI; it carries WHO (2021 + retained) + EU bands.
+    assert "eaqi_classic" not in bands and "eaqi_eea_2024" not in bands
+    assert set(bands) == {
+        "who_2021", "who_retained", "eu_2024_2881", "eu_2008_50_ec",
+    }
     assert "level" in co.attributes
     assert "level_label" in co.attributes
 
@@ -165,10 +174,10 @@ async def test_q4_european_aqi_bands_only_eaqi(
     aqi = hass.states.get("sensor.airwatch_open_meteo_european_aqi")
     bands = aqi.attributes["bands"]
     assert isinstance(bands, dict)
-    # The index has no µg/m³ WHO/EU guideline — EAQI only.
-    assert set(bands) == {"eaqi"}
-    assert "authority" in bands["eaqi"]
-    assert "averaging" in bands["eaqi"]
+    # The index has no µg/m³ WHO/EU guideline and no revised-index value — classic only.
+    assert set(bands) == {"eaqi_classic"}
+    assert "authority" in bands["eaqi_classic"]
+    assert "averaging" in bands["eaqi_classic"]
     assert "level" in aqi.attributes
     assert "level_label" in aqi.attributes
 
