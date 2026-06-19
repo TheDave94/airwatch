@@ -37,7 +37,7 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Detect integration-code changes
         # Required-check + path-filter deadlock fix: this job must always exist
@@ -62,7 +62,7 @@ jobs:
 
       - name: Set up Python 3.12
         if: steps.changes.outputs.integration == 'true'
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
