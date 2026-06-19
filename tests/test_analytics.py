@@ -224,10 +224,11 @@ def _series(current: float | None) -> PollutantSeries:
 
 
 def test_level_for_source_buckets_current_value():
-    # pm2_5 EAQI bounds (10,20,25,50,75); bands→levels {1,2→0; 3,4→1; 5,6→2}.
-    assert level_for_source("open_meteo", "pm2_5", _series(5.0)) == 0   # band 1
-    assert level_for_source("open_meteo", "pm2_5", _series(22.0)) == 1  # band 3
-    assert level_for_source("open_meteo", "pm2_5", _series(80.0)) == 2  # band 6
+    # Severity uses the revised WHO-aligned EEA index: pm2_5 bounds
+    # (5,15,50,90,140); bands→levels {1,2→0; 3,4→1; 5,6→2}.
+    assert level_for_source("open_meteo", "pm2_5", _series(5.0)) == 0    # band 1 good
+    assert level_for_source("open_meteo", "pm2_5", _series(22.0)) == 1   # band 3 moderate
+    assert level_for_source("open_meteo", "pm2_5", _series(120.0)) == 2  # band 5 very poor
 
 
 def test_level_for_source_none_current_returns_none():

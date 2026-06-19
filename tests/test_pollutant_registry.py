@@ -109,12 +109,30 @@ def test_eaqi_band_label_and_colour():
 # === level_for_value (EAQI 6-band -> 3-level collapse) =====================
 
 
+# Severity now follows the REVISED EEA index pm2_5 bounds (5,15,50,90,140):
+# bands {1,2}->0, {3,4}->1, {5,6}->2.
 @pytest.mark.parametrize(
     ("value", "level"),
-    [(5, 0), (15, 0), (22, 1), (40, 1), (60, 2), (90, 2)],
+    [(5, 0), (15, 0), (16, 1), (50, 1), (90, 1), (91, 2), (150, 2)],
 )
-def test_level_for_value_pm2_5_collapse(value, level):
+def test_level_for_value_pm2_5_collapse_revised(value, level):
     assert level_for_value("pm2_5", value) == level
+
+
+def test_severity_uses_revised_eea_not_classic():
+    """Behavior change lock: severity follows the revised WHO-aligned EEA index.
+
+    Same values, classic vs revised collapse:
+    - pm2_5 = 90: classic band 6 (extremely poor) -> level 2; revised band 4
+      (poor) -> level 1.
+    - pm2_5 = 18: classic band 2 (fair) -> level 0; revised band 3 (moderate)
+      -> level 1 (stricter at the low end).
+    """
+    assert level_for_value("pm2_5", 90) == 1
+    assert level_for_value("pm2_5", 18) == 1
+    # The divergence value pm2_5 = 8: revised band is "fair" (collapses to 0).
+    assert eaqi_band_label(index_band_for(EAQI_REVISED, "pm2_5", 8)) == "fair"
+    assert level_for_value("pm2_5", 8) == 0
 
 
 def test_level_for_value_none_and_unknown():

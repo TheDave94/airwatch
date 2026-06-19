@@ -37,7 +37,7 @@ _SC_URL = f"https://data.sensor.community/airrohr/v1/sensor/{_SC_STATION}/"
 
 
 def _om_payload() -> dict:
-    """Open-Meteo OK payload. pm2_5 current 12 → EAQI band 2 → level 0 (good)."""
+    """Open-Meteo OK payload. pm2_5 current 12 → revised EEA band 2 → level 0 (good)."""
     now = dt_util.now().replace(minute=0, second=0, microsecond=0)
     times = [
         (now - timedelta(days=1) + timedelta(hours=6 * i)).strftime("%Y-%m-%dT%H:00")
@@ -59,9 +59,11 @@ def _om_payload() -> dict:
 
 
 def _sc_payload() -> list[dict]:
-    """Sensor.Community station reading. pm2_5 80 → EAQI band 6 → level 2 (high).
+    """Sensor.Community station reading. pm2_5 120 → revised EEA band 5 → level 2.
 
     Two levels above Open-Meteo's level 0 → consensus 'mixed' + divergence on.
+    (Under the revised index pm2_5 must be ≥91 for level 2; 120 lands in the
+    "very poor" 91–140 band.)
     """
     ts = (datetime.now(UTC) - timedelta(minutes=1)).strftime("%Y-%m-%d %H:%M:%S")
     return [
@@ -71,7 +73,7 @@ def _sc_payload() -> list[dict]:
             "sensor": {"id": _SC_STATION, "sensor_type": {"name": "SDS011"}},
             "sensordatavalues": [
                 {"value_type": "P1", "value": "85.0"},
-                {"value_type": "P2", "value": "80.0"},
+                {"value_type": "P2", "value": "120.0"},
             ],
         }
     ]
@@ -115,7 +117,7 @@ async def test_two_sources_drive_consensus_and_divergence(
     om_pm = hass.states.get("sensor.airwatch_open_meteo_pm2_5")
     sc_pm = hass.states.get("sensor.airwatch_sensor_community_pm2_5")
     assert om_pm is not None and float(om_pm.state) == 12.0
-    assert sc_pm is not None and float(sc_pm.state) == 80.0
+    assert sc_pm is not None and float(sc_pm.state) == 120.0
     # Sensor.Community carries the fault-rejected station count.
     assert sc_pm.attributes.get("native_value") == "1 station(s)"
 
