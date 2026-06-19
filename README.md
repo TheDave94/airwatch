@@ -6,11 +6,11 @@ as a [HACS](https://hacs.xyz/) custom repository. Sibling project to
 consensus / provenance architecture, re-skinned from pollen onto air-quality
 pollutants.
 
-> **Status: v1 in development.** All three data sources work end-to-end
-> (Open-Meteo / CAMS primary, plus the opt-in Sensor.Community and Land
-> Steiermark secondaries) and the integration sets up with live entities and
-> cross-source analytics; the Lovelace card is not finished yet (see
-> [Roadmap](#roadmap)). Not yet published to the HACS default store.
+> **Status: v1 feature-complete, pre-release.** All three data sources work
+> end-to-end (Open-Meteo / CAMS primary, plus the opt-in Sensor.Community and
+> Land Steiermark secondaries), the integration sets up with live entities and
+> cross-source analytics, and the bundled [Lovelace card](#lovelace-card) is
+> done. Not yet published to the HACS default store.
 
 ## What it does
 
@@ -115,6 +115,60 @@ also matches the WHO/EU mass-concentration basis used for CO bands.
    location and the pollutants to track; AirWatch probes Open-Meteo coverage
    before finishing.
 
+## Lovelace card
+
+Installing AirWatch also delivers a bundled **`custom:airwatch-card`** — one
+install, no separate HACS-frontend step. The integration serves and registers the
+card automatically on first load, so it appears in the card picker after a refresh
+(hard-reload the browser if you don't see it).
+
+The card follows a **progressive-disclosure** model:
+
+- **At a glance (always visible):** a headline severity — the *worst* revised-EEA
+  sub-index across your pollutants, with the official EEA colour ramp — plus one
+  compact row per pollutant showing its current reading and its own revised-EEA
+  band colour. This is "what is the air doing now."
+- **On tap (the depth):** each pollutant row expands to its **multi-authority
+  provenance** — what WHO 2021 (per averaging window + interim targets) and EU
+  2024/2881 (both statutory milestones) say about that reading, the
+  **classic-vs-revised EEA** index divergence ("Open-Meteo's index says X, the
+  current official index says Y"), and the **cross-source consensus** (n/m
+  sources, agree / disagree). CO is shown on its WHO/EU basis, not a faked EAQI
+  band.
+
+It handles the states the data layer actually produces: a stale or all-invalid
+source reads as **Unknown** (the fail-safe, never a fake green), a disabled source
+(Land Steiermark is off by default) simply drops out of the consensus, and missing
+pollutants are omitted.
+
+### Card configuration
+
+All options are optional — with no config the card discovers the entry's selected
+pollutants over WebSocket (falling back to an entity scan) and shows them all. Use
+the visual editor, or YAML:
+
+```yaml
+type: custom:airwatch-card
+title: Air quality          # header title (default: "Air quality")
+expanded_default: false     # start with every row's provenance expanded
+pollutants:                 # optional subset / explicit order; default = all configured
+  - pm2_5
+  - pm10
+  - nitrogen_dioxide
+  - ozone
+  - carbon_monoxide
+sources:                    # optional filter for the glance reading; default = all enabled
+  - open_meteo
+  - sensor_community
+```
+
+| Option | Type | Default | Meaning |
+|---|---|---|---|
+| `title` | string | `Air quality` | Card header. |
+| `pollutants` | list | discovered | Which pollutants to show, in order. Blank = all configured. |
+| `sources` | list | all enabled | Restrict the glance reading to these sources (consensus still shows every source). |
+| `expanded_default` | bool | `false` | Expand all provenance on load. |
+
 ## Roadmap
 
 | | |
@@ -125,7 +179,7 @@ also matches the WHO/EU mass-concentration basis used for CO bands.
 | Governance (cleanroom no-loss gates · release-please · CI) | ✅ ported |
 | Sensor.Community secondary source (fault-rejecting, consensus-enabled) | ✅ implemented, live-verified |
 | Land Steiermark drift-anchor source (SensorThings, lag-aware, disabled by default) | ✅ implemented, live-verified |
-| Lovelace card (AQI colour ramps) | 🚧 planned |
+| Lovelace card (revised-EEA colour ramps · progressive provenance disclosure) | ✅ implemented |
 | Published to HACS | ⛔ not yet |
 
 Design rationale lives in the HA-config atlas:
