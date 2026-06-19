@@ -6,11 +6,12 @@ as a [HACS](https://hacs.xyz/) custom repository. Sibling project to
 consensus / provenance architecture, re-skinned from pollen onto air-quality
 pollutants.
 
-> **Status: v1 feature-complete, pre-release.** All three data sources work
-> end-to-end (Open-Meteo / CAMS primary, plus the opt-in Sensor.Community and
-> Land Steiermark secondaries), the integration sets up with live entities and
-> cross-source analytics, and the bundled [Lovelace card](#lovelace-card) is
-> done. Not yet published to the HACS default store.
+> **Status: v1 released.** All three data sources work end-to-end (Open-Meteo /
+> CAMS primary, plus the opt-in Sensor.Community and Land Steiermark secondaries),
+> the integration sets up with live entities and cross-source analytics, and the
+> bundled [Lovelace card](#lovelace-card) is done. Install today as a
+> [HACS custom repository](#installation-hacs-custom-repository); not yet in the
+> HACS default store (a separate submission).
 
 ## What it does
 
@@ -122,6 +123,16 @@ install, no separate HACS-frontend step. The integration serves and registers th
 card automatically on first load, so it appears in the card picker after a refresh
 (hard-reload the browser if you don't see it).
 
+| Light theme | Dark theme |
+|---|---|
+| ![AirWatch card, light theme](brand/assets/screenshots/card-light.png) | ![AirWatch card, dark theme](brand/assets/screenshots/card-dark.png) |
+
+The chrome is **theme-native** — surface, text and font come from your Home
+Assistant theme, while the EEA gauge, severity ramp and pollutant glyphs keep their
+fixed identity on any theme:
+
+![AirWatch card on a custom theme](brand/assets/screenshots/card-custom-theme.png)
+
 The card follows a **progressive-disclosure** model:
 
 - **At a glance (always visible):** a headline severity — the *worst* revised-EEA
@@ -186,7 +197,8 @@ their fixed identity). See [`brand/HA_CARD_REVIEW.md`](brand/HA_CARD_REVIEW.md).
 | Sensor.Community secondary source (fault-rejecting, consensus-enabled) | ✅ implemented, live-verified |
 | Land Steiermark drift-anchor source (SensorThings, lag-aware, disabled by default) | ✅ implemented, live-verified |
 | Lovelace card (revised-EEA colour ramps · progressive provenance disclosure) | ✅ implemented |
-| Published to HACS | ⛔ not yet |
+| First release · installable as a HACS custom repository | ✅ |
+| HACS default-store inclusion | ⛔ separate submission |
 
 Design rationale lives in the HA-config atlas:
 `docs/atlas/air-quality-fusion-roadmap.md` §9 (in the `homeassistant-config`
