@@ -294,12 +294,14 @@
   }
 
   // ── EEA 6-band severity gauge (adapts the PollenWatch gauge mechanics) ─
-  // viewBox 0 0 120 92; 6 segments green/cyan→purple, opening downward. The
+  // A clean 180° dial (the brand guide's .gauge-big composition): the hub sits
+  // ON the arc baseline and the viewBox is cropped tight, so the
+  // arc→needle→hub reads as ONE connected gauge. 6 segments cyan→purple. The
   // needle rests at the ACTIVE band's segment centre (never interpolated) and
-  // is removed for the unknown state (dashed gray track, gray-never-green). The
-  // active segment thickens and the hub takes its colour ("status hub"). A
-  // subtle air-swirl under the dial echoes the brand mark.
-  const GA = { CX: 60, CY: 60, R: 44, W: 11, H: 78, GAP: 2, N: 6 };
+  // is removed for the unknown state (dashed gray track, gray-never-green); the
+  // active segment thickens and the hub takes its colour ("status hub"). The
+  // air motif lives in the header mark, not inside the dial.
+  const GA = { CX: 60, CY: 58, R: 45, W: 11, H: 90, GAP: 3, N: 6, VH: 70 };
   const gpt = (r, deg) => {
     const a = (deg - 90) * Math.PI / 180;
     return [GA.CX + r * Math.cos(a), GA.CY + r * Math.sin(a)];
@@ -322,29 +324,25 @@
     }
     return out;
   }
-  function gSwirl(col, op) {
-    return `<g class="aw-swirl" opacity="${op}" fill="none" stroke="${col}" stroke-linecap="round" stroke-width="2.6"><path d="M45 64 H63 a3.8 3.8 0 1 0 -3.5 -3.8"/><path d="M43 71 H60 a4 4 0 1 1 -3.7 4"/></g>`;
-  }
   function gNeedle(deg) {
-    const [nx, ny] = gpt(GA.R - 7, deg);
+    const [nx, ny] = gpt(GA.R - 9, deg);
     return `<path class="aw-needle" d="M${GA.CX} ${GA.CY} L${gf(nx)} ${gf(ny)}" stroke="${SLATE}" stroke-width="3.6" stroke-linecap="round"/>`;
   }
   // band: 1..6 → active band; null → unknown (resting, no needle).
   function awGauge(band) {
     const B = gBounds();
+    const open = `<svg class="aw-gauge" viewBox="0 0 120 ${GA.VH}" xmlns="http://www.w3.org/2000/svg">`;
     if (!band) {
-      return `<svg class="aw-gauge" viewBox="0 0 120 92" xmlns="http://www.w3.org/2000/svg">${
+      return `${open}${
         gArc(-GA.H, GA.H, UNKNOWN_COLOUR, GA.W, 0.9, '1.5 5')
-      }${gSwirl(UNKNOWN_COLOUR, 0.22)
-      }<circle cx="60" cy="60" r="4.5" fill="var(--aw-cloud,#fff)" stroke="${UNKNOWN_COLOUR}" stroke-width="2"/></svg>`;
+      }<circle class="hub" cx="${GA.CX}" cy="${GA.CY}" r="5" fill="var(--aw-cloud,#fff)" stroke="${UNKNOWN_COLOUR}" stroke-width="2"/></svg>`;
     }
     const ai = band - 1;
     const col = EAQI_PALETTE[band].colour;
     const segs = B.map((b, i) =>
       gArc(b[0], b[1], EAQI_PALETTE[i + 1].colour, i === ai ? GA.W + 3 : GA.W, 1)).join('');
-    return `<svg class="aw-gauge" viewBox="0 0 120 92" xmlns="http://www.w3.org/2000/svg">${
-      segs}${gSwirl(col, 0.3)}${gNeedle(B[ai][2])
-    }<circle cx="60" cy="60" r="4.5" fill="${col}"/></svg>`;
+    return `${open}${segs}${gNeedle(B[ai][2])
+    }<circle class="hub" cx="${GA.CX}" cy="${GA.CY}" r="5" fill="${col}"/></svg>`;
   }
 
   // ── CSS ──────────────────────────────────────────────────────────────
@@ -382,8 +380,8 @@
     }
 
     /* ── header: mark · title · meta ── */
-    .header { display: flex; align-items: center; gap: 12px; }
-    .mark { width: 40px; height: 40px; flex-shrink: 0; }
+    .header { display: flex; align-items: center; gap: 14px; }
+    .mark { width: 48px; height: 48px; flex-shrink: 0; margin: 1px 2px 0 0; }
     .mark svg { width: 100%; height: 100%; display: block; }
     .titles { min-width: 0; }
     .title {
@@ -399,27 +397,30 @@
       background: var(--aw-edge);
     }
 
-    /* ── hero: gauge + reading ── */
+    /* ── hero: gauge + reading (even vertical rhythm) ── */
     .hero {
-      display: flex; flex-direction: column; align-items: center;
-      padding: 12px 0 8px; margin-top: 8px;
+      display: flex; flex-direction: column; align-items: center; gap: 12px;
+      padding: 16px 0; margin-top: 14px;
       border-top: 1px solid var(--aw-edge);
     }
-    .gauge-wrap { width: 208px; max-width: 70%; }
+    .gauge-wrap { width: 210px; max-width: 66%; }
     .aw-gauge { width: 100%; height: auto; display: block; }
     .aw-needle, .hub { transition: opacity 200ms; }
-    .reading { text-align: center; margin-top: 2px; }
+    .reading { text-align: center; }
     .reading .level {
       font-family: var(--aw-font-display); font-weight: 700; font-size: 30px;
       line-height: 1; letter-spacing: -0.02em; transition: color 200ms;
     }
     .reading .cap {
       font-size: 12px; color: var(--aw-muted); letter-spacing: 0.06em;
-      text-transform: uppercase; margin-top: 7px;
+      text-transform: uppercase; margin-top: 6px;
     }
 
     /* ── rows ── */
-    .rows { display: flex; flex-direction: column; gap: 1px; margin-top: 8px; }
+    .rows {
+      display: flex; flex-direction: column; gap: 1px;
+      padding-top: 6px; border-top: 1px solid var(--aw-edge);
+    }
     .row {
       display: block; width: 100%; text-align: left; padding: 0;
       background: transparent; border: none; color: inherit; font: inherit;
@@ -465,8 +466,11 @@
     }
     .row[aria-expanded="true"] .chev { transform: rotate(90deg); }
 
-    /* ── expanded provenance / consensus ── */
-    .detail { display: none; padding: 2px 12px 12px 41px; }
+    /* ── expanded provenance / consensus ──
+       Left padding aligns the detail to the row's NAME column (row-head
+       padding-left 10 + glyph 30 + gap 11 = 51), so the callout sits on the
+       same vertical grid line as the pollutant names above/below. */
+    .detail { display: none; padding: 2px 10px 14px 51px; }
     .row[aria-expanded="true"] + .detail { display: block; }
     .detail-block { margin-top: 12px; }
     .detail-block:first-child { margin-top: 4px; }
