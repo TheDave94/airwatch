@@ -163,10 +163,11 @@ ATTR_STATION: Final = "station"
 # Provenance/threshold attributes (Q4 — expose, don't assert).
 ATTR_LEVEL: Final = "level"
 ATTR_LEVEL_LABEL: Final = "level_label"
-# Provenance-tagged band assessments, keyed by authority (eaqi / who_2021 /
-# eu_limit), each carrying authority + value + averaging window. The authorities
-# are kept DISTINCT — never collapsed into one verdict. See
-# pollutant_registry.band_provenance.
+# Provenance-tagged band assessments, keyed by authority (eaqi_classic /
+# eaqi_eea_2024 / who_2021 / who_retained / eu_2024_2881 / eu_2008_50_ec). WHO/EU
+# authorities carry a LIST of per-averaging-window entries; index authorities a
+# single band dict. Authorities are kept DISTINCT — never collapsed into one
+# verdict. See pollutant_registry.band_provenance.
 ATTR_BANDS: Final = "bands"
 # CO convenience conversion (Q3 — exposed as a tagged attribute, not the state).
 ATTR_CO_PPM: Final = "value_ppm"

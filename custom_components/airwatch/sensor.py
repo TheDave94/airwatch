@@ -330,8 +330,9 @@ class AirWatchSensor(CoordinatorEntity[AirWatchSourceCoordinator], SensorEntity)
         # Normalised severity from the integration's own bucketing
         # (analytics.level_for_source — single source of truth for every
         # downstream consumer). Band provenance is exposed, not asserted (Q4):
-        # ATTR_BANDS keys each authority (eaqi / who_2021 / eu_limit) distinctly,
-        # carrying authority + value + averaging window — never collapsed.
+        # ATTR_BANDS keys each authority distinctly (eaqi_classic / eaqi_eea_2024
+        # / who_2021 / who_retained / eu_2024_2881 / eu_2008_50_ec), each carrying
+        # value + averaging window (+ interim targets / DOIs) — never collapsed.
         lvl = level_for_source(self._source_key, self._pollutant, series)
         attrs: dict[str, Any] = {
             ATTR_FORECAST: _forecast_attr(
