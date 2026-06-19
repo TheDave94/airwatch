@@ -22,10 +22,10 @@
           "update_interval": "Wie oft Open-Meteo abgefragt wird. Mindestens 60 Minuten, um die kostenlose öffentliche API zu schonen.",
           "enable_sensor_community": "Fügt nahegelegene Sensor.Community-PM2.5/PM10-Bürgersensoren als zweite Quelle hinzu und ermöglicht so Konsens und Divergenz über mehrere Quellen. Fehlerhafte SDS011-Werte (999,9) werden verworfen und die gültigen Stationen gemittelt.",
           "sensor_community_distance_km": "Wie weit nach Bürgersensoren gesucht wird, wenn unten keine Stations-IDs angegeben sind.",
-          "sensor_community_stations": "Kommagetrennte Sensor-IDs zur exakten Nutzung (z. B. 45690,97590,85910). Leer lassen, um die nächstgelegenen Sensoren im Suchradius automatisch zu finden.",
+          "sensor_community_stations": "Kommagetrennte Sensor.Community-Sensor-IDs zur exakten Nutzung. Leer lassen, um die nächstgelegenen Sensoren im Suchradius automatisch zu finden.",
           "enable_land_steiermark": "Fügt die nächstgelegene amtliche österreichische/steirische Messstation über den SensorThings-Harvest hinzu. Dies ist ein verzögerter Best-Effort-Feed — ein langsamer Drift-Anker, keine Live-Quelle: Jeder Wert trägt seine Station und sein Alter, und veraltete Daten werden als nicht verfügbar gemeldet, statt als aktuell angezeigt zu werden.",
           "land_steiermark_distance_km": "Wie weit nach einer amtlichen Station gesucht wird, wenn unten keine Stations-ID angegeben ist. Amtliche Stationen sind seltener als Bürgersensoren, daher ist der Standardradius größer.",
-          "land_steiermark_station": "Eine exakte Stations-localId (z. B. STA.06.164 für Graz Don Bosco). Leer lassen, um automatisch die nächstgelegene nutzbare Station im Radius zu wählen."
+          "land_steiermark_station": "Eine exakte Stations-localId (z. B. STA.06.NNN). Leer lassen, um automatisch die nächstgelegene nutzbare Station im Radius zu wählen."
         }
       }
     },
@@ -58,10 +58,10 @@
           "update_interval": "Wie oft Open-Meteo abgefragt wird. Mindestens 60 Minuten, um die kostenlose öffentliche API zu schonen.",
           "enable_sensor_community": "Fügt nahegelegene Sensor.Community-PM2.5/PM10-Bürgersensoren als zweite Quelle hinzu und ermöglicht so Konsens und Divergenz über mehrere Quellen. Fehlerhafte SDS011-Werte (999,9) werden verworfen und die gültigen Stationen gemittelt.",
           "sensor_community_distance_km": "Wie weit nach Bürgersensoren gesucht wird, wenn keine Stations-IDs angegeben sind.",
-          "sensor_community_stations": "Kommagetrennte Sensor-IDs zur exakten Nutzung (z. B. 45690,97590,85910). Leer lassen, um die nächstgelegenen Sensoren im Suchradius automatisch zu finden.",
+          "sensor_community_stations": "Kommagetrennte Sensor.Community-Sensor-IDs zur exakten Nutzung. Leer lassen, um die nächstgelegenen Sensoren im Suchradius automatisch zu finden.",
           "enable_land_steiermark": "Fügt die nächstgelegene amtliche österreichische/steirische Messstation über den SensorThings-Harvest hinzu. Dies ist ein verzögerter Best-Effort-Feed — ein langsamer Drift-Anker, keine Live-Quelle: Jeder Wert trägt seine Station und sein Alter, und veraltete Daten werden als nicht verfügbar gemeldet, statt als aktuell angezeigt zu werden.",
           "land_steiermark_distance_km": "Wie weit nach einer amtlichen Station gesucht wird, wenn keine Stations-ID angegeben ist. Amtliche Stationen sind seltener als Bürgersensoren, daher ist der Standardradius größer.",
-          "land_steiermark_station": "Eine exakte Stations-localId (z. B. STA.06.164 für Graz Don Bosco). Leer lassen, um automatisch die nächstgelegene nutzbare Station im Radius zu wählen."
+          "land_steiermark_station": "Eine exakte Stations-localId (z. B. STA.06.NNN). Leer lassen, um automatisch die nächstgelegene nutzbare Station im Radius zu wählen."
         }
       }
     },

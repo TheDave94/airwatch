@@ -20,11 +20,11 @@ Sole prerequisite: a fine-grained GitHub PAT (read-only, public-repo) at `~/.con
    - Mints a fresh run directory under `cleanroom/runs/<timestamp>/`.
    - Pre-seeds a fresh HA config dir: HACS extracted in place; `.storage/core.config_entries` written with a HACS entry holding your pre-seeded GitHub PAT. **No device-flow wall.**
    - Starts a new HA container `aw-cleanroom-<timestamp>` on the placeholder port against that config dir.
-   - Walks the onboarding API (creates owner, sets core config to AT / Vienna / Graz coords, mints long-lived access token). **No browser.**
+   - Walks the onboarding API (creates owner, sets core config to AT / Vienna coords, mints long-lived access token). **No browser.**
    - Polls for HACS ready, adds `TheDave94/airwatch`, downloads the pinned baseline version.
    - Restarts container; creates the two diagnostic config entries from `cleanroom/config/matrix.json`:
      - **Entry A** — Munich, all canonical pollutants.
-     - **Entry B** — Graz, subset `[pm2_5, pm10]`.
+     - **Entry B** — Vienna, subset `[pm2_5, pm10]`.
    - Polls until every airwatch entity has its first real state (180s ceiling; SETTLE TIMEOUT on ceiling-hit).
    - Takes a BEFORE snapshot under `runs/<timestamp>/snapshots/before/`.
 

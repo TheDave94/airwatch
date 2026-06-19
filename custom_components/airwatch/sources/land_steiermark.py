@@ -10,7 +10,7 @@ Why "drift anchor", not a live source
 OPEN_QUESTIONS.md Q6 shipped Land Steiermark *disabled by default* because no
 clean real-time feed was known. A 2026-06-19 read-only investigation refined
 that: a machine-readable, hourly-structured, coordinate-tagged SensorThings feed
-*does* exist and carries Graz/Steiermark PM10 / PM2.5 / NO2 / O3 / SO2 / CO with
+*does* exist and carries Steiermark PM10 / PM2.5 / NO2 / O3 / SO2 / CO with
 station coordinates — but it is **not a reliable near-real-time feed**:
 
 - The canonical DataCove endpoint (``service.datacove.eu/AirThings/v1.1``) was
@@ -38,10 +38,11 @@ Like ``open_meteo.py`` / ``sensor_community.py`` this module is HA-free with an
 injectable transport, so parsing/selection are pure and unit-testable offline.
 Run it directly::
 
-    python -m custom_components.airwatch.sources.land_steiermark --lat 47.07 --lon 15.44
-    python -m custom_components.airwatch.sources.land_steiermark --station STA.06.164
+    python -m custom_components.airwatch.sources.land_steiermark --station STA.06.NNN
+    # or auto-pick the nearest Steiermark station to a coordinate:
+    python -m custom_components.airwatch.sources.land_steiermark --lat <lat> --lon <lon>
     # widen the staleness window to see the (lagged) drift-anchor value today:
-    python -m custom_components.airwatch.sources.land_steiermark --lat 47.07 --max-age-hours 300
+    python -m custom_components.airwatch.sources.land_steiermark --lat <lat> --max-age-hours 300
 """
 
 from __future__ import annotations
@@ -795,10 +796,10 @@ def _main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Probe Land Steiermark (Austrian SensorThings) for a location or station.",
     )
-    parser.add_argument("--lat", type=float, default=47.0707, help="latitude")
-    parser.add_argument("--lon", type=float, default=15.4395, help="longitude")
+    parser.add_argument("--lat", type=float, default=0.0, help="latitude")
+    parser.add_argument("--lon", type=float, default=0.0, help="longitude")
     parser.add_argument(
-        "--station", default="", help="explicit station localId (e.g. STA.06.164)"
+        "--station", default="", help="explicit station localId (e.g. STA.06.NNN)"
     )
     parser.add_argument("--max-distance-km", type=float, default=DEFAULT_MAX_DISTANCE_KM)
     parser.add_argument("--max-age-hours", type=int, default=DEFAULT_MAX_AGE_HOURS)

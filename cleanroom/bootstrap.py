@@ -464,9 +464,9 @@ def main() -> int:
         owner_password=secrets.token_urlsafe(24),
         language="en",
         country="AT",
-        location_name="Clean Room (Graz)",
-        latitude=47.0707,
-        longitude=15.4395,
+        location_name="Clean Room (Vienna)",
+        latitude=48.2082,
+        longitude=16.3738,
         elevation=353,
         time_zone="Europe/Vienna",
     )

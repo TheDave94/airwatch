@@ -13,8 +13,7 @@ Robustness reuse
 ----------------
 This source reproduces, in the integration's source-contract form, the
 hard-won robustness of the live in-HA-config REST sensor
-(``homeassistant-config: packages/air_quality.yaml``, live-verified 2026-06-18,
-stations 45690 / 97590 / 85910 near Graz):
+(``homeassistant-config: packages/air_quality.yaml``, live-verified 2026-06-18):
 
 - **SDS011 fault rejection** — a reading is valid only if ``0 < value < 900``.
   This drops the SDS011 stuck-at-max fault value (999.9) *and* non-positive
@@ -32,8 +31,8 @@ stations 45690 / 97590 / 85910 near Graz):
 Like ``open_meteo.py`` this module is HA-free and has an injectable transport, so
 ``parse``/aggregation are pure and unit-testable offline. Run it directly::
 
-    python -m custom_components.airwatch.sources.sensor_community --lat 47.0707 --lon 15.4395
-    python -m custom_components.airwatch.sources.sensor_community --stations 45690,97590,85910
+    python -m custom_components.airwatch.sources.sensor_community --lat 48.2082 --lon 16.3738
+    python -m custom_components.airwatch.sources.sensor_community --stations <sensor-id>,<sensor-id>
 """
 
 from __future__ import annotations
@@ -576,8 +575,8 @@ def _main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Probe Sensor.Community for a location or station set.",
     )
-    parser.add_argument("--lat", type=float, default=47.0707, help="latitude")
-    parser.add_argument("--lon", type=float, default=15.4395, help="longitude")
+    parser.add_argument("--lat", type=float, default=48.2082, help="latitude")
+    parser.add_argument("--lon", type=float, default=16.3738, help="longitude")
     parser.add_argument(
         "--stations",
         default="",

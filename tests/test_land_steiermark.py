@@ -31,7 +31,7 @@ from custom_components.airwatch.sources.land_steiermark import (
 )
 
 _NOW = datetime(2026, 6, 19, 12, 0, 0, tzinfo=UTC)
-_GRAZ_LAT, _GRAZ_LON = 47.07, 15.44
+_SITE_LAT, _SITE_LON = 48.21, 16.37
 
 
 def _pt(hours_ago: float) -> str:
@@ -43,8 +43,8 @@ def _pt(hours_ago: float) -> str:
 
 
 def _datastream(op_name: str, result: float, hours_ago: float, *,
-                local_id: str = "STA.06.164", name: str = "Graz Don Bosco",
-                lat: float = 47.055611, lon: float = 15.416603) -> dict:
+                local_id: str = "STA.06.001", name: str = "Example Station A",
+                lat: float = 48.195611, lon: float = 16.346603) -> dict:
     return {
         "Thing": {
             "name": name,
@@ -126,17 +126,17 @@ def test_parse_discovery_groups_streams_by_station():
         "value": [
             _datastream("PM10", 6.6, 2.0),
             _datastream("NO2", 29.3, 2.0),
-            _datastream("PM10", 7.0, 1.0, local_id="STA.06.018",
-                        name="Graz Schloßberg", lat=47.073, lon=15.437),
+            _datastream("PM10", 7.0, 1.0, local_id="STA.06.002",
+                        name="Example Station B", lat=48.213, lon=16.367),
         ]
     }
     stations = parse_discovery(
         payload, ["pm10", "nitrogen_dioxide"],
-        requested_lat=_GRAZ_LAT, requested_lon=_GRAZ_LON,
+        requested_lat=_SITE_LAT, requested_lon=_SITE_LON,
     )
     by_id = {s.local_id: s for s in stations}
-    assert set(by_id) == {"STA.06.164", "STA.06.018"}
-    donbosco = by_id["STA.06.164"]
+    assert set(by_id) == {"STA.06.001", "STA.06.002"}
+    donbosco = by_id["STA.06.001"]
     assert set(donbosco.readings) == {"pm10", "nitrogen_dioxide"}
     assert donbosco.readings["pm10"][0] == 6.6
     assert donbosco.distance_km is not None and donbosco.distance_km < 5
@@ -145,7 +145,7 @@ def test_parse_discovery_groups_streams_by_station():
 def test_parse_discovery_ignores_unrequested_pollutant():
     payload = {"value": [_datastream("O3", 80.0, 1.0)]}
     stations = parse_discovery(
-        payload, ["pm10"], requested_lat=_GRAZ_LAT, requested_lon=_GRAZ_LON
+        payload, ["pm10"], requested_lat=_SITE_LAT, requested_lon=_SITE_LON
     )
     # Station still registered (so it can be diagnosed), but with no readings.
     assert len(stations) == 1
@@ -160,7 +160,7 @@ def test_parse_discovery_dedupes_keeping_newest():
         ]
     }
     stations = parse_discovery(
-        payload, ["pm10"], requested_lat=_GRAZ_LAT, requested_lon=_GRAZ_LON
+        payload, ["pm10"], requested_lat=_SITE_LAT, requested_lon=_SITE_LON
     )
     assert stations[0].readings["pm10"][0] == 6.6
 
@@ -170,16 +170,16 @@ def test_parse_discovery_dedupes_keeping_newest():
 
 def test_parse_things_extracts_datastreams():
     payload = _things_payload(
-        "STA.06.164", "Graz Don Bosco", 47.0556, 15.4166,
+        "STA.06.001", "Example Station A", 48.1956, 16.3466,
         [("PM10", 6.6, 2.0), ("NO2", 29.3, 2.0)],
     )
     stations = parse_things(
         payload, ["pm10", "nitrogen_dioxide"],
-        requested_lat=_GRAZ_LAT, requested_lon=_GRAZ_LON,
+        requested_lat=_SITE_LAT, requested_lon=_SITE_LON,
     )
     assert len(stations) == 1
     s = stations[0]
-    assert s.local_id == "STA.06.164"
+    assert s.local_id == "STA.06.001"
     assert set(s.readings) == {"pm10", "nitrogen_dioxide"}
 
 
@@ -188,7 +188,7 @@ def test_parse_things_extracts_datastreams():
 
 def _station(local_id, dist, readings) -> StationObservation:
     return StationObservation(
-        local_id=local_id, name=local_id, latitude=47.0, longitude=15.0,
+        local_id=local_id, name=local_id, latitude=48.14, longitude=15.93,
         distance_km=dist, readings=readings,
     )
 
@@ -223,7 +223,7 @@ def test_select_out_of_range_returns_none():
 
 
 def test_select_explicit_returns_single():
-    s = _station("STA.06.164", 99.0, {})
+    s = _station("STA.06.001", 99.0, {})
     assert select_station(
         [s], max_distance_km=1, now=_NOW, max_age_hours=72, explicit=True
     ) is s
@@ -233,22 +233,22 @@ def test_select_explicit_returns_single():
 
 
 def test_build_result_ok_surfaces_lag_in_native():
-    s = _station("STA.06.164", 2.4, {"pm10": (6.6, _NOW - timedelta(hours=48))})
+    s = _station("STA.06.001", 2.4, {"pm10": (6.6, _NOW - timedelta(hours=48))})
     result = build_result(
-        s, ["pm10"], requested_lat=_GRAZ_LAT, requested_lon=_GRAZ_LON,
+        s, ["pm10"], requested_lat=_SITE_LAT, requested_lon=_SITE_LON,
         now=_NOW, max_age_hours=72,
     )
     assert result.status is SourceStatus.OK
     series = result.pollutants["pm10"]
     assert series.current == 6.6
     assert series.unit == "µg/m³"
-    assert "STA.06.164" in series.native and "old" in series.native
+    assert "STA.06.001" in series.native and "old" in series.native
     assert "drift anchor" in result.station
 
 
 def test_build_result_no_station_out_of_coverage():
     result = build_result(
-        None, ["pm10"], requested_lat=_GRAZ_LAT, requested_lon=_GRAZ_LON,
+        None, ["pm10"], requested_lat=_SITE_LAT, requested_lon=_SITE_LON,
         now=_NOW, max_age_hours=72,
     )
     assert result.status is SourceStatus.OUT_OF_COVERAGE
@@ -257,9 +257,9 @@ def test_build_result_no_station_out_of_coverage():
 
 
 def test_build_result_stale_reports_lag():
-    s = _station("STA.06.164", 2.4, {"pm10": (6.6, _NOW - timedelta(hours=216))})
+    s = _station("STA.06.001", 2.4, {"pm10": (6.6, _NOW - timedelta(hours=216))})
     result = build_result(
-        s, ["pm10"], requested_lat=_GRAZ_LAT, requested_lon=_GRAZ_LON,
+        s, ["pm10"], requested_lat=_SITE_LAT, requested_lon=_SITE_LON,
         now=_NOW, max_age_hours=72,
     )
     assert result.status is SourceStatus.OUT_OF_COVERAGE
@@ -268,9 +268,9 @@ def test_build_result_stale_reports_lag():
 
 
 def test_build_result_all_invalid_reports_no_valid():
-    s = _station("STA.06.164", 2.4, {"pm10": (0.0, _NOW - timedelta(hours=2))})
+    s = _station("STA.06.001", 2.4, {"pm10": (0.0, _NOW - timedelta(hours=2))})
     result = build_result(
-        s, ["pm10"], requested_lat=_GRAZ_LAT, requested_lon=_GRAZ_LON,
+        s, ["pm10"], requested_lat=_SITE_LAT, requested_lon=_SITE_LON,
         now=_NOW, max_age_hours=72,
     )
     assert result.status is SourceStatus.OUT_OF_COVERAGE
@@ -281,7 +281,7 @@ def test_build_result_all_invalid_reports_no_valid():
 
 
 def test_source_flags_mark_drift_anchor():
-    src = LandSteiermarkSource(_GRAZ_LAT, _GRAZ_LON, ["pm10"])
+    src = LandSteiermarkSource(_SITE_LAT, _SITE_LON, ["pm10"])
     assert src.cadence == CADENCE == "drift_anchor"
     assert src.supports_history is False
     assert src.provides_history_series is False
@@ -289,13 +289,13 @@ def test_source_flags_mark_drift_anchor():
 
 def test_source_validate_drops_unsupported_pollutants():
     src = LandSteiermarkSource(
-        _GRAZ_LAT, _GRAZ_LON, ["pm10", "european_aqi", "bogus"]
+        _SITE_LAT, _SITE_LON, ["pm10", "european_aqi", "bogus"]
     )
     assert src.pollutants == ["pm10"]
 
 
 def test_source_empty_pollutants_out_of_coverage():
-    src = LandSteiermarkSource(_GRAZ_LAT, _GRAZ_LON, ["european_aqi"])
+    src = LandSteiermarkSource(_SITE_LAT, _SITE_LON, ["european_aqi"])
     result = src.fetch()
     assert result.status is SourceStatus.OUT_OF_COVERAGE
 
@@ -310,26 +310,26 @@ def test_source_discovery_ok_picks_nearest_usable():
     payload = {
         "value": [
             # nearest but all-invalid (0.0)
-            _datastream("PM10", 0.0, 2.0, local_id="STA.06.018",
-                        name="Schloßberg", lat=47.073, lon=15.437),
+            _datastream("PM10", 0.0, 2.0, local_id="STA.06.002",
+                        name="Example Station B", lat=48.213, lon=16.367),
             # slightly farther, valid + fresh
             _datastream("PM10", 6.6, 2.0),
         ]
     }
     src = LandSteiermarkSource(
-        _GRAZ_LAT, _GRAZ_LON, ["pm10"],
+        _SITE_LAT, _SITE_LON, ["pm10"],
         transport=_transport(payload), now_fn=lambda: _NOW,
     )
     result = src.fetch()
     assert result.status is SourceStatus.OK
     assert result.pollutants["pm10"].current == 6.6
-    assert "STA.06.164" in result.station
+    assert "STA.06.001" in result.station
 
 
 def test_source_discovery_all_stale_out_of_coverage():
     payload = {"value": [_datastream("PM10", 6.6, 216.0)]}  # 9 days old
     src = LandSteiermarkSource(
-        _GRAZ_LAT, _GRAZ_LON, ["pm10"],
+        _SITE_LAT, _SITE_LON, ["pm10"],
         transport=_transport(payload), now_fn=lambda: _NOW,
     )
     result = src.fetch()
@@ -339,11 +339,11 @@ def test_source_discovery_all_stale_out_of_coverage():
 
 def test_source_explicit_station_ok():
     payload = _things_payload(
-        "STA.06.164", "Graz Don Bosco", 47.0556, 15.4166,
+        "STA.06.001", "Example Station A", 48.1956, 16.3466,
         [("PM10", 6.6, 2.0)],
     )
     src = LandSteiermarkSource(
-        _GRAZ_LAT, _GRAZ_LON, ["pm10"], station="STA.06.164",
+        _SITE_LAT, _SITE_LON, ["pm10"], station="STA.06.001",
         transport=_transport(payload), now_fn=lambda: _NOW,
     )
     result = src.fetch()
@@ -356,7 +356,7 @@ def test_source_transport_failure_raises_unavailable():
         raise ConnectionError("down")
 
     src = LandSteiermarkSource(
-        _GRAZ_LAT, _GRAZ_LON, ["pm10"], transport=failing,
+        _SITE_LAT, _SITE_LON, ["pm10"], transport=failing,
         retry_delay=0, now_fn=lambda: _NOW,
     )
     with pytest.raises(SourceUnavailable):
@@ -367,7 +367,7 @@ def test_source_transport_failure_raises_unavailable():
 
 
 def test_discovery_url_scopes_region_and_pollutants():
-    src = LandSteiermarkSource(_GRAZ_LAT, _GRAZ_LON, ["pm10", "nitrogen_dioxide"])
+    src = LandSteiermarkSource(_SITE_LAT, _SITE_LON, ["pm10", "nitrogen_dioxide"])
     url = src.discovery_url()
     assert "/Datastreams?" in url
     assert "STA.06" in url
@@ -376,7 +376,7 @@ def test_discovery_url_scopes_region_and_pollutants():
 
 
 def test_station_url_targets_things_by_local_id():
-    src = LandSteiermarkSource(_GRAZ_LAT, _GRAZ_LON, ["pm10"], station="STA.06.164")
-    url = src.station_url("STA.06.164")
+    src = LandSteiermarkSource(_SITE_LAT, _SITE_LON, ["pm10"], station="STA.06.001")
+    url = src.station_url("STA.06.001")
     assert "/Things?" in url
-    assert "STA.06.164" in url
+    assert "STA.06.001" in url

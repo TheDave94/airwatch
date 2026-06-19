@@ -22,7 +22,7 @@ from custom_components.airwatch.sources.open_meteo import OpenMeteoSource
 def _european_payload() -> dict:
     """A trimmed but realistic successful Open-Meteo air-quality response.
 
-    Coordinates are snapped (47.0707 -> 47.1, 15.4395 -> 15.4). The pm2_5
+    Coordinates are snapped (48.2082 -> 48.2, 16.3738 -> 16.4). The pm2_5
     series ends in a ``None`` to mirror the forecast horizon running out.
     """
     times = [
@@ -32,8 +32,8 @@ def _european_payload() -> dict:
         "2026-05-29T15:00",
     ]
     return {
-        "latitude": 47.1,
-        "longitude": 15.4,
+        "latitude": 48.2,
+        "longitude": 16.4,
         "timezone": "Europe/Vienna",
         "elevation": 363.0,
         "hourly_units": {"pm2_5": "µg/m³", "ozone": "µg/m³"},
@@ -60,7 +60,7 @@ def _transport_returning(status: int, payload: object):
 
 def test_success_for_european_coords_parses_series():
     source = OpenMeteoSource(
-        47.0707, 15.4395, ["pm2_5", "ozone"],
+        48.2082, 16.3738, ["pm2_5", "ozone"],
         transport=_transport_returning(200, _european_payload()),
     )
     result = source.fetch()
@@ -69,10 +69,10 @@ def test_success_for_european_coords_parses_series():
     assert result.status is SourceStatus.OK
     assert result.source == "open_meteo"
     # snapped coordinates surfaced and shift computed
-    assert result.snapped_lat == 47.1
-    assert result.snapped_lon == 15.4
+    assert result.snapped_lat == 48.2
+    assert result.snapped_lon == 16.4
     assert result.coordinate_shift_km is not None
-    assert 3.0 < result.coordinate_shift_km < 6.0
+    assert 1.0 < result.coordinate_shift_km < 4.0
     # both requested pollutants present with aligned values + current
     assert set(result.pollutants) == {"pm2_5", "ozone"}
     pm = result.pollutants["pm2_5"]
@@ -101,7 +101,7 @@ def test_unexpected_error_reason_raises_response_error():
     transport = _transport_returning(
         400, {"error": True, "reason": "Invalid hourly variable foo"}
     )
-    source = OpenMeteoSource(47.07, 15.44, ["pm2_5"], transport=transport)
+    source = OpenMeteoSource(48.21, 16.37, ["pm2_5"], transport=transport)
 
     with pytest.raises(SourceResponseError):
         source.fetch()
@@ -117,7 +117,7 @@ def test_network_error_retries_once_then_succeeds():
         return 200, _european_payload()
 
     source = OpenMeteoSource(
-        47.07, 15.44, ["pm2_5"], transport=flaky_transport, retry_delay=0
+        48.21, 16.37, ["pm2_5"], transport=flaky_transport, retry_delay=0
     )
     result = source.fetch()
 
@@ -133,7 +133,7 @@ def test_network_error_exhausts_retries_and_raises_unavailable():
         raise urllib.error.URLError("down")
 
     source = OpenMeteoSource(
-        47.07, 15.44, ["pm2_5"], transport=always_fails, retry_delay=0
+        48.21, 16.37, ["pm2_5"], transport=always_fails, retry_delay=0
     )
     with pytest.raises(SourceUnavailable):
         source.fetch()
@@ -147,13 +147,13 @@ def test_unknown_pollutant_silent_dropped_at_construction():
     the keys it can. Raising would block any install selecting a pollutant OM
     doesn't cover."""
     source = OpenMeteoSource(
-        47.07, 15.44, ["pm2_5", "ozone", "pollen_birch", "noise"]
+        48.21, 16.37, ["pm2_5", "ozone", "pollen_birch", "noise"]
     )
     assert source.pollutants == ["pm2_5", "ozone"]
 
 
 def test_past_days_clamped_to_provider_maximum():
-    source = OpenMeteoSource(47.07, 15.44, ["pm2_5"], past_days=999)
+    source = OpenMeteoSource(48.21, 16.37, ["pm2_5"], past_days=999)
     assert source.past_days == 92
     assert "past_days=92" in source.build_url()
     assert "domains=cams_europe" in source.build_url()
@@ -161,14 +161,14 @@ def test_past_days_clamped_to_provider_maximum():
 
 def test_parse_is_pure_and_handles_european_aqi_index():
     payload = {
-        "latitude": 47.1,
-        "longitude": 15.4,
+        "latitude": 48.2,
+        "longitude": 16.4,
         "timezone": "Europe/Vienna",
         "hourly_units": {"european_aqi": ""},
         "current": {"time": "2026-05-29T14:00", "european_aqi": 42},
         "hourly": {"time": ["2026-05-29T14:00"], "european_aqi": [42]},
     }
-    source = OpenMeteoSource(47.0707, 15.4395, ["european_aqi"])
+    source = OpenMeteoSource(48.2082, 16.3738, ["european_aqi"])
     result = source.parse(payload)
     assert result.status is SourceStatus.OK
     assert result.pollutants["european_aqi"].current == 42
@@ -187,7 +187,7 @@ def _async_transport_returning(status: int, payload: object):
 
 def test_async_success_parses_series():
     source = OpenMeteoSource(
-        47.0707, 15.4395, ["pm2_5", "ozone"],
+        48.2082, 16.3738, ["pm2_5", "ozone"],
         async_transport=_async_transport_returning(200, _european_payload()),
     )
     result = asyncio.run(source.async_fetch())
@@ -222,7 +222,7 @@ def test_async_retries_once_then_succeeds():
         return 200, _european_payload()
 
     source = OpenMeteoSource(
-        47.07, 15.44, ["pm2_5"], async_transport=flaky, retry_delay=0
+        48.21, 16.37, ["pm2_5"], async_transport=flaky, retry_delay=0
     )
     result = asyncio.run(source.async_fetch())
 
@@ -238,7 +238,7 @@ def test_async_exhausts_retries_and_raises_unavailable():
         raise ConnectionError("down")  # OSError subclass
 
     source = OpenMeteoSource(
-        47.07, 15.44, ["pm2_5"], async_transport=always_fails, retry_delay=0
+        48.21, 16.37, ["pm2_5"], async_transport=always_fails, retry_delay=0
     )
     with pytest.raises(SourceUnavailable):
         asyncio.run(source.async_fetch())

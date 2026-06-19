@@ -65,8 +65,8 @@ def _payload(pollutants: list[str] | None = None) -> dict:
         current[p] = base
         units[p] = "" if p == "european_aqi" else "µg/m³"
     return {
-        "latitude": 47.1,
-        "longitude": 15.4,
+        "latitude": 48.2,
+        "longitude": 16.4,
         "timezone": "Europe/Vienna",
         "elevation": 363.0,
         "hourly_units": units,
@@ -80,9 +80,9 @@ def _entry(pollutants: list[str] | None = None) -> MockConfigEntry:
     return MockConfigEntry(
         domain=DOMAIN,
         version=1,
-        unique_id="47.0700_15.4400",
-        title="AirWatch (47.070, 15.440)",
-        data={CONF_LATITUDE: 47.07, CONF_LONGITUDE: 15.44},
+        unique_id="48.2100_16.3700",
+        title="AirWatch (48.210, 16.370)",
+        data={CONF_LATITUDE: 48.21, CONF_LONGITUDE: 16.37},
         options={
             CONF_SELECTED_POLLUTANTS: pollutants,
             CONF_UPDATE_INTERVAL: 60,

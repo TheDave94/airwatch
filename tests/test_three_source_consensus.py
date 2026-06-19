@@ -35,7 +35,7 @@ from custom_components.airwatch.const import (
 from custom_components.airwatch.sources.open_meteo import BASE_URL as OM_URL
 
 _POLLUTANTS = ["pm2_5", "pm10"]
-_SC_STATION = 45690
+_SC_STATION = 11111
 _SC_URL = f"https://data.sensor.community/airrohr/v1/sensor/{_SC_STATION}/"
 _LS_DATASTREAMS = (
     "https://airquality-frost.k8s.ilt-dmz.iosb.fraunhofer.de/v1.1/Datastreams"
@@ -57,7 +57,7 @@ def _om_payload() -> dict:
         current[p] = val
         units[p] = "µg/m³"
     return {
-        "latitude": 47.1, "longitude": 15.4, "timezone": "Europe/Vienna",
+        "latitude": 48.2, "longitude": 16.4, "timezone": "Europe/Vienna",
         "elevation": 363.0, "hourly_units": units, "current": current,
         "hourly": hourly,
     }
@@ -68,7 +68,7 @@ def _sc_payload() -> list[dict]:
     return [
         {
             "timestamp": ts,
-            "location": {"latitude": "47.07", "longitude": "15.44"},
+            "location": {"latitude": "48.21", "longitude": "16.37"},
             "sensor": {"id": _SC_STATION, "sensor_type": {"name": "SDS011"}},
             "sensordatavalues": [
                 {"value_type": "P1", "value": "22.0"},
@@ -79,16 +79,16 @@ def _sc_payload() -> list[dict]:
 
 
 def _ls_payload() -> dict:
-    """A fresh Land Steiermark discovery response (one Graz station, pm2_5)."""
+    """A fresh Land Steiermark discovery response (one example station, pm2_5)."""
     end = (datetime.now(UTC) - timedelta(hours=1)).replace(microsecond=0)
     start = end - timedelta(hours=1)
     fmt = "%Y-%m-%dT%H:%M:%SZ"
     phenomenon = f"{start.strftime(fmt)}/{end.strftime(fmt)}"
     station = {
-        "name": "Graz Don Bosco",
-        "properties": {"localId": "STA.06.164", "countryCode": "AT"},
+        "name": "Example Station A",
+        "properties": {"localId": "STA.06.001", "countryCode": "AT"},
         "Locations": [
-            {"location": {"type": "Point", "coordinates": [15.4166, 47.0556]}}
+            {"location": {"type": "Point", "coordinates": [16.3466, 48.1956]}}
         ],
     }
     return {
@@ -122,9 +122,9 @@ def _entry() -> MockConfigEntry:
         },
     }
     return MockConfigEntry(
-        domain=DOMAIN, version=1, unique_id="47.0700_15.4400",
-        title="AirWatch (47.070, 15.440)",
-        data={CONF_LATITUDE: 47.07, CONF_LONGITUDE: 15.44},
+        domain=DOMAIN, version=1, unique_id="48.2100_16.3700",
+        title="AirWatch (48.210, 16.370)",
+        data={CONF_LATITUDE: 48.21, CONF_LONGITUDE: 16.37},
         options={
             CONF_SELECTED_POLLUTANTS: _POLLUTANTS,
             CONF_UPDATE_INTERVAL: 60,
@@ -150,7 +150,7 @@ async def test_three_sources_drive_consensus(
     ls_pm = hass.states.get("sensor.airwatch_land_steiermark_pm2_5")
     assert ls_pm is not None and float(ls_pm.state) == 14.0
     # Its native value surfaces the station + age (drift-anchor provenance).
-    assert "STA.06.164" in ls_pm.attributes.get("native_value", "")
+    assert "STA.06.001" in ls_pm.attributes.get("native_value", "")
     assert "old" in ls_pm.attributes.get("native_value", "")
 
     # Consensus now spans THREE sources for pm2_5.

@@ -14,10 +14,10 @@
       "_role": "common-case: all canonical pollutants. Validates the happy path."
     },
     {
-      "name": "graz-subset-pm25-pm10",
-      "location_label": "Graz",
-      "latitude": 47.0707,
-      "longitude": 15.4395,
+      "name": "vienna-subset-pm25-pm10",
+      "location_label": "Vienna",
+      "latitude": 48.2082,
+      "longitude": 16.3738,
       "pollutants": ["pm2_5", "pm10"],
       "options": {},
       "_role": "DIAGNOSTIC: subset selection. THIS ENTRY IS NON-OPTIONAL. If migration silently resets to default-all, only Entry B catches it. Gate D asserts this entry's selection survives identical post-upgrade."

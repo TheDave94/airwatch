@@ -8,7 +8,7 @@ air-quality set.
 
 The module is standalone and HA-free. Run it directly to probe a location::
 
-    python -m custom_components.airwatch.sources.open_meteo --lat 47.0707 --lon 15.4395
+    python -m custom_components.airwatch.sources.open_meteo --lat 48.2082 --lon 16.3738
 
 Design notes
 ------------
@@ -383,9 +383,9 @@ def _main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Probe Open-Meteo CAMS air-quality for a location.",
     )
-    # Default coordinates: Graz, Austria.
-    parser.add_argument("--lat", type=float, default=47.0707, help="latitude")
-    parser.add_argument("--lon", type=float, default=15.4395, help="longitude")
+    # Default coordinates: Vienna, Austria.
+    parser.add_argument("--lat", type=float, default=48.2082, help="latitude")
+    parser.add_argument("--lon", type=float, default=16.3738, help="longitude")
     parser.add_argument(
         "--pollutants",
         default=",".join(SUPPORTED_POLLUTANTS),

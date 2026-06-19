@@ -29,7 +29,7 @@ from custom_components.airwatch.const import (
 )
 from custom_components.airwatch.sources.open_meteo import BASE_URL
 
-_LOCATION = {CONF_LATITUDE: 47.07, CONF_LONGITUDE: 15.44}
+_LOCATION = {CONF_LATITUDE: 48.21, CONF_LONGITUDE: 16.37}
 
 
 def _ok_payload() -> dict:
@@ -39,8 +39,8 @@ def _ok_payload() -> dict:
     couple of pollutants and a short time axis are enough.
     """
     return {
-        "latitude": 47.1,
-        "longitude": 15.4,
+        "latitude": 48.2,
+        "longitude": 16.4,
         "timezone": "Europe/Vienna",
         "elevation": 363.0,
         "hourly_units": {"pm2_5": "µg/m³", "pm10": "µg/m³"},
@@ -97,11 +97,11 @@ async def test_user_flow_creates_entry(
         )
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert result["data"] == {CONF_LATITUDE: 47.07, CONF_LONGITUDE: 15.44}
+    assert result["data"] == {CONF_LATITUDE: 48.21, CONF_LONGITUDE: 16.37}
     assert result["options"][CONF_SELECTED_POLLUTANTS] == ["pm2_5", "pm10"]
     assert result["options"][CONF_UPDATE_INTERVAL] == 60
     assert result["options"][CONF_SOURCES] == new_sources_config()
-    assert result["result"].unique_id == "47.0700_15.4400"
+    assert result["result"].unique_id == "48.2100_16.3700"
 
 
 async def test_user_flow_out_of_coverage_aborts(
@@ -165,7 +165,7 @@ async def test_user_flow_requires_a_pollutant(hass: HomeAssistant) -> None:
 
 async def test_duplicate_location_aborts(hass: HomeAssistant) -> None:
     """A second entry at the same rounded location aborts already_configured."""
-    MockConfigEntry(domain=DOMAIN, unique_id="47.0700_15.4400").add_to_hass(hass)
+    MockConfigEntry(domain=DOMAIN, unique_id="48.2100_16.3700").add_to_hass(hass)
 
     result = await _start(hass)
     result = await hass.config_entries.flow.async_configure(
@@ -187,8 +187,8 @@ async def test_options_flow_updates_pollutants_and_interval(
     """The options flow rewrites the selection + interval and preserves sources."""
     entry = MockConfigEntry(
         domain=DOMAIN,
-        unique_id="47.0700_15.4400",
-        data={CONF_LATITUDE: 47.07, CONF_LONGITUDE: 15.44},
+        unique_id="48.2100_16.3700",
+        data={CONF_LATITUDE: 48.21, CONF_LONGITUDE: 16.37},
         options={
             CONF_SELECTED_POLLUTANTS: ["pm2_5", "pm10"],
             CONF_UPDATE_INTERVAL: 60,
@@ -217,8 +217,8 @@ async def test_options_flow_requires_a_pollutant(hass: HomeAssistant) -> None:
     """An empty selection in the options flow re-shows the form with the error."""
     entry = MockConfigEntry(
         domain=DOMAIN,
-        unique_id="47.0700_15.4400",
-        data={CONF_LATITUDE: 47.07, CONF_LONGITUDE: 15.44},
+        unique_id="48.2100_16.3700",
+        data={CONF_LATITUDE: 48.21, CONF_LONGITUDE: 16.37},
         options={
             CONF_SELECTED_POLLUTANTS: ["pm2_5"],
             CONF_UPDATE_INTERVAL: 60,

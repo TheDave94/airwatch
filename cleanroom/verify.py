@@ -71,8 +71,8 @@ def _find_entry_for_matrix(entries: list[dict], matrix_entry: dict) -> dict | No
       2. `data.location.{latitude,longitude}` (nested — defensive for older
          shapes or if a later schema ever wraps location). Same tolerance.
       3. Title parse: airwatch sets entry title to "AirWatch (LAT, LON)" with
-         3-decimal rounding (e.g. "AirWatch (47.071, 15.440)" for 47.0707,
-         15.4395). Compare with tolerance 0.01 to absorb the rounding.
+         3-decimal rounding (e.g. "AirWatch (48.208, 16.374)" for 48.2082,
+         16.3738). Compare with tolerance 0.01 to absorb the rounding.
 
     Returns the matching entry dict, or None."""
     import re as _re

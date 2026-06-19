@@ -32,7 +32,7 @@ from custom_components.airwatch.const import (
 from custom_components.airwatch.sources.open_meteo import BASE_URL as OM_URL
 
 _POLLUTANTS = ["pm2_5", "pm10"]
-_SC_STATION = 45690
+_SC_STATION = 11111
 _SC_URL = f"https://data.sensor.community/airrohr/v1/sensor/{_SC_STATION}/"
 
 
@@ -52,7 +52,7 @@ def _om_payload() -> dict:
         current[p] = val
         units[p] = "µg/m³"
     return {
-        "latitude": 47.1, "longitude": 15.4, "timezone": "Europe/Vienna",
+        "latitude": 48.2, "longitude": 16.4, "timezone": "Europe/Vienna",
         "elevation": 363.0, "hourly_units": units, "current": current,
         "hourly": hourly,
     }
@@ -69,7 +69,7 @@ def _sc_payload() -> list[dict]:
     return [
         {
             "timestamp": ts,
-            "location": {"latitude": "47.07", "longitude": "15.44"},
+            "location": {"latitude": "48.21", "longitude": "16.37"},
             "sensor": {"id": _SC_STATION, "sensor_type": {"name": "SDS011"}},
             "sensordatavalues": [
                 {"value_type": "P1", "value": "85.0"},
@@ -90,9 +90,9 @@ def _entry() -> MockConfigEntry:
         SOURCE_LAND_STEIERMARK: {CONF_ENABLED: False, "station": ""},
     }
     return MockConfigEntry(
-        domain=DOMAIN, version=1, unique_id="47.0700_15.4400",
-        title="AirWatch (47.070, 15.440)",
-        data={CONF_LATITUDE: 47.07, CONF_LONGITUDE: 15.44},
+        domain=DOMAIN, version=1, unique_id="48.2100_16.3700",
+        title="AirWatch (48.210, 16.370)",
+        data={CONF_LATITUDE: 48.21, CONF_LONGITUDE: 16.37},
         options={
             CONF_SELECTED_POLLUTANTS: _POLLUTANTS,
             CONF_UPDATE_INTERVAL: 60,
