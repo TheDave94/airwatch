@@ -1,0 +1,73 @@
+/*
+ * AirWatch design tokens — the in-repo source of truth for the --aw-* set.
+ * ADAPTED 1:1 from PollenWatch's --pw-* tokens (the family resemblance): the
+ * neutrals, type, radii and "higher is worse" philosophy transfer unchanged;
+ * the severity ramp becomes the official EEA 6-band air-quality scale and the
+ * brand accent becomes an air/atmosphere azure (the --pw-gold analog).
+ *
+ * These are the BRAND values. The Lovelace card (custom_components/airwatch/
+ * frontend/airwatch-card.js) re-declares the neutrals layered over Home
+ * Assistant theme variables (e.g. --aw-ink: var(--primary-text-color, #2A3540))
+ * so it respects the user's HA theme — but the EEA severity ramp and the sky
+ * accent are HARD values there too, never theme-shifted.
+ */
+:root {
+  /* ── Brand accent — air / atmosphere (replaces PollenWatch's pollen gold) ── */
+  --aw-sky:        #2E7DD1;  /* primary brand / "air"; the --pw-gold analog */
+  --aw-sky-light:  #8FC7F0;  /* haze; dark-lockup accent / "Watch" on dark   */
+  --aw-sky-deep:   #1F5C9E;  /* pressed / deep accent                         */
+
+  /* ── Neutrals (transfer unchanged from PollenWatch) ── */
+  --aw-ink:    #2A3540;  /* primary text            */
+  --aw-slate:  #33414F;  /* gauge needle + hub      */
+  --aw-muted:  #7C8794;  /* secondary text          */
+  --aw-paper:  #FBF7F0;  /* warm background         */
+  --aw-cloud:  #FFFFFF;  /* card surface            */
+  --aw-edge:   #ECE4D6;  /* borders / dividers      */
+
+  /*
+   * ── Severity ramp — the official EEA 6-band air-quality scale ──
+   * Order is meaningful: good (cool/clean air) → extremely poor (worst).
+   * Science-anchored (EEA European Air Quality Index palette, mirrored from
+   * pollutant_registry.EAQI_BANDS). RULE: any severity-bearing surface (gauge
+   * segment, pill, swatch, reading) MUST use this ramp and map a higher band →
+   * a worse colour. Never invent severity colours; never theme-shift them.
+   */
+  --aw-eaqi-1: #50f0e6;  /* Good            */
+  --aw-eaqi-2: #50ccaa;  /* Fair            */
+  --aw-eaqi-3: #f0e641;  /* Moderate        */
+  --aw-eaqi-4: #ff5050;  /* Poor            */
+  --aw-eaqi-5: #960032;  /* Very poor       */
+  --aw-eaqi-6: #7d2181;  /* Extremely poor  */
+
+  /*
+   * ── CO / common-level ramp ──
+   * Carbon monoxide is NOT in the EAQI; its severity is WHO/EU-driven and shown
+   * on this distinct 3-step green→amber→red ramp so it never masquerades as a
+   * 6-band EAQI rating. Also used for the per-source level dots in the
+   * cross-source consensus breakdown (analytics levels 0/1/2).
+   */
+  --aw-level-0: #3DAE5A;  /* good / level 0      */
+  --aw-level-1: #F2A516;  /* elevated / level 1 */
+  --aw-level-2: #E0492E;  /* high / level 2     */
+
+  /* ── Per-glyph tint (color-neutral pollutant SVGs read these) ── */
+  --aw-grain-stroke: var(--aw-ink);   /* outline + detail (legible on any band) */
+  --aw-grain-fill:   #E8EBEE;         /* body fill (washed with the band colour) */
+
+  /* ── Typography (transfers unchanged: Bricolage display / Hanken text) ── */
+  --aw-font-display: "Bricolage Grotesque", system-ui, sans-serif;  /* wordmark / headings */
+  --aw-font-text:    "Hanken Grotesk", system-ui, sans-serif;       /* body / UI / numeric */
+
+  /* ── Radii (transfer unchanged) ── */
+  --aw-r-pill: 999px;  /* pills, chips        */
+  --aw-r-card: 16px;   /* cards (16–18px)     */
+  --aw-r-sw:   14px;   /* swatches / tiles    */
+}
+
+/*
+ * Dark lockup note (carried from the PollenWatch caveat): the slate needle and
+ * the azure air-swirl are intentionally low-contrast on dark surfaces — the
+ * bright EEA dial carries the mark. For a high-contrast dark lockup, shift the
+ * needle/swirl to --aw-sky-light without changing the silhouette.
+ */
