@@ -8,9 +8,10 @@ Open-Meteo's HTTP 400 error body — not from all-zero values). Location is
 intentionally fixed after setup; pollutants and the update interval are
 editable in the options flow.
 
-The multi-source enablement UI (Sensor.Community, Land Steiermark) is out of
-scope for v1: ``new_sources_config()`` seeds those sources disabled and the
-flow leaves them out entirely.
+The optional secondary sources (Sensor.Community, Land Steiermark) are exposed
+as opt-in toggles in both the initial step and the options flow; both default to
+disabled. Land Steiermark is a lagged drift-anchor feed (see its source module),
+so it is opt-in and surfaces its staleness rather than asserting live values.
 """
 
 from __future__ import annotations
@@ -33,14 +34,17 @@ from .const import (
     CONF_MAX_DISTANCE_KM,
     CONF_SELECTED_POLLUTANTS,
     CONF_SOURCES,
+    CONF_STATION,
     CONF_STATIONS,
     CONF_UPDATE_INTERVAL,
     DEFAULT_MAX_DISTANCE_KM,
     DEFAULT_SELECTED_POLLUTANTS,
     DEFAULT_UPDATE_INTERVAL_MIN,
     DOMAIN,
+    LAND_STEIERMARK_MAX_DISTANCE_KM,
     MAX_UPDATE_INTERVAL_MIN,
     MIN_UPDATE_INTERVAL_MIN,
+    SOURCE_LAND_STEIERMARK,
     SOURCE_SENSOR_COMMUNITY,
     new_sources_config,
 )
@@ -147,6 +151,51 @@ def _apply_sc_input(sources: dict, user_input: dict) -> dict:
     return sources
 
 
+# --- optional Land Steiermark secondary source (DRIFT ANCHOR) -------------
+# Disabled by default (OPEN_QUESTIONS.md Q6): the official feed is a lagged,
+# best-effort SensorThings harvest, surfaced as a slow drift anchor.
+CONF_ENABLE_LS = "enable_land_steiermark"
+CONF_LS_STATION = "land_steiermark_station"
+CONF_LS_DISTANCE = "land_steiermark_distance_km"
+
+_LS_DISTANCE_SELECTOR = selector.NumberSelector(
+    selector.NumberSelectorConfig(
+        min=1, max=100, step=1, unit_of_measurement="km",
+        mode=selector.NumberSelectorMode.BOX,
+    )
+)
+
+
+def _ls_schema_fields(
+    *, enabled: bool, station: str, distance: float
+) -> dict:
+    """Schema fields for the optional Land Steiermark source (config + options)."""
+    return {
+        vol.Optional(CONF_ENABLE_LS, default=enabled): selector.BooleanSelector(),
+        vol.Optional(
+            CONF_LS_DISTANCE, default=distance
+        ): _LS_DISTANCE_SELECTOR,
+        vol.Optional(
+            CONF_LS_STATION, default=station or ""
+        ): selector.TextSelector(),
+    }
+
+
+def _apply_ls_input(sources: dict, user_input: dict) -> dict:
+    """Overlay the submitted Land Steiermark fields onto a sources config.
+
+    Leaving everything at its defaults reproduces ``new_sources_config()``'s
+    land_steiermark entry (disabled, default radius, no explicit station).
+    """
+    ls = sources.setdefault(SOURCE_LAND_STEIERMARK, {})
+    ls[CONF_ENABLED] = bool(user_input.get(CONF_ENABLE_LS, False))
+    ls[CONF_STATION] = str(user_input.get(CONF_LS_STATION, "") or "").strip()
+    ls[CONF_MAX_DISTANCE_KM] = float(
+        user_input.get(CONF_LS_DISTANCE, LAND_STEIERMARK_MAX_DISTANCE_KM)
+    )
+    return sources
+
+
 async def _async_probe_coverage(
     hass, latitude: float, longitude: float, pollutants: list[str]
 ) -> str | None:
@@ -217,8 +266,9 @@ class AirWatchConfigFlow(ConfigFlow, domain=DOMAIN):
                         options={
                             CONF_SELECTED_POLLUTANTS: pollutants,
                             CONF_UPDATE_INTERVAL: interval,
-                            CONF_SOURCES: _apply_sc_input(
-                                new_sources_config(), user_input
+                            CONF_SOURCES: _apply_ls_input(
+                                _apply_sc_input(new_sources_config(), user_input),
+                                user_input,
                             ),
                         },
                     )
@@ -244,6 +294,11 @@ class AirWatchConfigFlow(ConfigFlow, domain=DOMAIN):
                 **_sc_schema_fields(
                     enabled=False, distance=DEFAULT_MAX_DISTANCE_KM, stations=[]
                 ),
+                **_ls_schema_fields(
+                    enabled=False,
+                    station="",
+                    distance=LAND_STEIERMARK_MAX_DISTANCE_KM,
+                ),
             }
         )
         # On an error re-render, re-seed the form with what the user submitted
@@ -265,9 +320,9 @@ class AirWatchConfigFlow(ConfigFlow, domain=DOMAIN):
 class AirWatchOptionsFlow(OptionsFlow):
     """Edit pollutants and the update interval after setup.
 
-    Location is fixed (remove + re-add to change it). Multi-source enablement
-    is out of scope for v1; the seeded ``CONF_SOURCES`` config is preserved
-    untouched.
+    Location is fixed (remove + re-add to change it). The optional secondary
+    sources (Sensor.Community, Land Steiermark) are editable here; any source
+    keys the UI doesn't expose are preserved untouched.
     """
 
     async def async_step_init(
@@ -296,7 +351,10 @@ class AirWatchOptionsFlow(OptionsFlow):
                         CONF_UPDATE_INTERVAL: int(
                             user_input[CONF_UPDATE_INTERVAL]
                         ),
-                        CONF_SOURCES: _apply_sc_input(current_sources, user_input),
+                        CONF_SOURCES: _apply_ls_input(
+                            _apply_sc_input(current_sources, user_input),
+                            user_input,
+                        ),
                     }
                 )
 
@@ -307,6 +365,7 @@ class AirWatchOptionsFlow(OptionsFlow):
             entry, CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL_MIN
         )
         sc_cfg = current_sources.get(SOURCE_SENSOR_COMMUNITY, {})
+        ls_cfg = current_sources.get(SOURCE_LAND_STEIERMARK, {})
         schema = vol.Schema(
             {
                 vol.Required(
@@ -321,6 +380,15 @@ class AirWatchOptionsFlow(OptionsFlow):
                         sc_cfg.get(CONF_MAX_DISTANCE_KM, DEFAULT_MAX_DISTANCE_KM)
                     ),
                     stations=sc_cfg.get(CONF_STATIONS, []),
+                ),
+                **_ls_schema_fields(
+                    enabled=bool(ls_cfg.get(CONF_ENABLED, False)),
+                    station=str(ls_cfg.get(CONF_STATION, "") or ""),
+                    distance=float(
+                        ls_cfg.get(
+                            CONF_MAX_DISTANCE_KM, LAND_STEIERMARK_MAX_DISTANCE_KM
+                        )
+                    ),
                 ),
             }
         )

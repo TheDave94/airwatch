@@ -6,9 +6,10 @@ as a [HACS](https://hacs.xyz/) custom repository. Sibling project to
 consensus / provenance architecture, re-skinned from pollen onto air-quality
 pollutants.
 
-> **Status: v1 in development.** The primary source (Open-Meteo / CAMS) works
-> end-to-end and the integration sets up with live entities; the secondary
-> sources and the Lovelace card are not finished yet (see
+> **Status: v1 in development.** All three data sources work end-to-end
+> (Open-Meteo / CAMS primary, plus the opt-in Sensor.Community and Land
+> Steiermark secondaries) and the integration sets up with live entities and
+> cross-source analytics; the Lovelace card is not finished yet (see
 > [Roadmap](#roadmap)). Not yet published to the HACS default store.
 
 ## What it does
@@ -25,7 +26,16 @@ threshold it is**.
   use explicit station IDs), averages the valid ones, and **rejects SDS011 fault
   readings** (the stuck-at-max 999.9) and stale data. Enabling it gives the
   consensus/divergence analytics a second source to cross-check Open-Meteo.
-- **Land Steiermark** official daily-mean stations *(planned, opt-in)*.
+- **Secondary source — Land Steiermark / Austrian network** *(opt-in, drift
+  anchor):* the official monitoring stations, reached through the community
+  [OGC SensorThings](https://www.ogc.org/standard/sensorthings/) harvest of the
+  Austrian feeds (DataCove / API4INSPIRE). This is a **lagged, best-effort feed**
+  — a *slow reference / drift anchor*, not a live source. AirWatch picks the
+  nearest usable Steiermark station (or an explicit station ID), and every
+  reading carries **which station, when, and how old it is**; data older than the
+  drift-anchor window is reported as *unavailable* rather than shown as current.
+  See [Thresholds & provenance](#thresholds--provenance) for the "expose, don't
+  assert" rationale this follows.
 - **Pollutants:** PM2.5, PM10, NO₂, O₃, SO₂, CO, and the European AQI index.
 
 ## Sensors
@@ -99,7 +109,7 @@ also matches the WHO/EU mass-concentration basis used for CO bands.
 | Pollutant registry · WHO + EAQI bands · provenance | ✅ implemented |
 | Governance (cleanroom no-loss gates · release-please · CI) | ✅ ported |
 | Sensor.Community secondary source (fault-rejecting, consensus-enabled) | ✅ implemented, live-verified |
-| Land Steiermark secondary source | 🚧 planned (disabled by default) |
+| Land Steiermark drift-anchor source (SensorThings, lag-aware, disabled by default) | ✅ implemented, live-verified |
 | Lovelace card (AQI colour ramps) | 🚧 planned |
 | Published to HACS | ⛔ not yet |
 

@@ -11,7 +11,10 @@
           "update_interval": "Update interval (minutes)",
           "enable_sensor_community": "Add Sensor.Community (hyperlocal PM)",
           "sensor_community_distance_km": "Sensor.Community search radius (km)",
-          "sensor_community_stations": "Sensor.Community station IDs (optional)"
+          "sensor_community_stations": "Sensor.Community station IDs (optional)",
+          "enable_land_steiermark": "Add Land Steiermark (official stations, drift anchor)",
+          "land_steiermark_distance_km": "Land Steiermark search radius (km)",
+          "land_steiermark_station": "Land Steiermark station ID (optional)"
         },
         "data_description": {
           "location": "Pick the point to monitor. Open-Meteo snaps it to the nearest ~10 km grid cell.",
@@ -19,7 +22,10 @@
           "update_interval": "How often to poll Open-Meteo. Minimum 60 minutes to be a good citizen on a free public API.",
           "enable_sensor_community": "Adds nearby Sensor.Community citizen PM2.5/PM10 sensors as a second source, enabling cross-source consensus and divergence. Faulty SDS011 readings (999.9) are rejected and the valid stations are averaged.",
           "sensor_community_distance_km": "How far to look for citizen sensors when no station IDs are given below.",
-          "sensor_community_stations": "Comma-separated sensor IDs to use exactly (e.g. 45690,97590,85910). Leave blank to auto-discover the nearest sensors within the search radius."
+          "sensor_community_stations": "Comma-separated sensor IDs to use exactly (e.g. 45690,97590,85910). Leave blank to auto-discover the nearest sensors within the search radius.",
+          "enable_land_steiermark": "Adds the nearest official Austrian/Steiermark monitoring station via the SensorThings harvest. This is a lagged, best-effort feed — a slow drift anchor, not a live source: each reading carries its station and how old it is, and stale data is reported as unavailable rather than shown as current.",
+          "land_steiermark_distance_km": "How far to look for an official station when no station ID is given below. Official stations are sparser than citizen sensors, so the default radius is wider.",
+          "land_steiermark_station": "An exact station localId to use (e.g. STA.06.164 for Graz Don Bosco). Leave blank to auto-pick the nearest usable station within the radius."
         }
       }
     },
@@ -42,14 +48,20 @@
           "update_interval": "Update interval (minutes)",
           "enable_sensor_community": "Add Sensor.Community (hyperlocal PM)",
           "sensor_community_distance_km": "Sensor.Community search radius (km)",
-          "sensor_community_stations": "Sensor.Community station IDs (optional)"
+          "sensor_community_stations": "Sensor.Community station IDs (optional)",
+          "enable_land_steiermark": "Add Land Steiermark (official stations, drift anchor)",
+          "land_steiermark_distance_km": "Land Steiermark search radius (km)",
+          "land_steiermark_station": "Land Steiermark station ID (optional)"
         },
         "data_description": {
           "selected_pollutants": "Each selected pollutant creates sensors per active source. Unselected pollutants don't create any entities.",
           "update_interval": "How often to poll Open-Meteo. Minimum 60 minutes to be a good citizen on a free public API.",
           "enable_sensor_community": "Adds nearby Sensor.Community citizen PM2.5/PM10 sensors as a second source, enabling cross-source consensus and divergence. Faulty SDS011 readings (999.9) are rejected and the valid stations are averaged.",
           "sensor_community_distance_km": "How far to look for citizen sensors when no station IDs are given below.",
-          "sensor_community_stations": "Comma-separated sensor IDs to use exactly (e.g. 45690,97590,85910). Leave blank to auto-discover the nearest sensors within the search radius."
+          "sensor_community_stations": "Comma-separated sensor IDs to use exactly (e.g. 45690,97590,85910). Leave blank to auto-discover the nearest sensors within the search radius.",
+          "enable_land_steiermark": "Adds the nearest official Austrian/Steiermark monitoring station via the SensorThings harvest. This is a lagged, best-effort feed — a slow drift anchor, not a live source: each reading carries its station and how old it is, and stale data is reported as unavailable rather than shown as current.",
+          "land_steiermark_distance_km": "How far to look for an official station when no station ID is given below. Official stations are sparser than citizen sensors, so the default radius is wider.",
+          "land_steiermark_station": "An exact station localId to use (e.g. STA.06.164 for Graz Don Bosco). Leave blank to auto-pick the nearest usable station within the radius."
         }
       }
     },
