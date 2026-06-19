@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/TheDave94/airwatch/compare/v1.0.0...v1.0.1) (2026-06-19)
+
+
+### Bug Fixes
+
+* scrub location-identifying example data from the public repo ([6375b38](https://github.com/TheDave94/airwatch/commit/6375b38f0a65750d602c95228bdd76a9ec7a479e))
+
 ## 1.0.0 (2026-06-19)
 
 
