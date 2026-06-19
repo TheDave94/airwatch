@@ -61,7 +61,7 @@ SOURCE_DEVICE_NAMES: Final[dict[str, str]] = {
 SOURCE_DEVICE_MODELS: Final[dict[str, str]] = {
     SOURCE_OPEN_METEO: "CAMS via Open-Meteo",
     SOURCE_SENSOR_COMMUNITY: "Sensor.Community (citizen network)",
-    SOURCE_LAND_STEIERMARK: "Land Steiermark Luftgüte (daily mean)",
+    SOURCE_LAND_STEIERMARK: "Austrian network (SensorThings, drift anchor)",
 }
 SOURCE_CONFIG_URLS: Final[dict[str, str]] = {
     SOURCE_OPEN_METEO: "https://open-meteo.com/",
@@ -89,9 +89,13 @@ CONF_STATION: Final = "station"  # Land Steiermark single-station ref
 # Explicit Sensor.Community station IDs (list[int]); empty → auto-discover by
 # distance. Plural — distinct from CONF_STATION (Land Steiermark, singular).
 CONF_STATIONS: Final = "stations"
-# Max distance (km) to accept a Sensor.Community nearest-sensor match.
+# Max distance (km) to accept a nearest-station match. Shared by Sensor.Community
+# (citizen sensors, dense) and Land Steiermark (official stations, sparse — hence
+# its own wider default below).
 CONF_MAX_DISTANCE_KM: Final = "max_distance_km"
 DEFAULT_MAX_DISTANCE_KM: Final = 10.0
+# Land Steiermark official stations are sparse; default to a wider search radius.
+LAND_STEIERMARK_MAX_DISTANCE_KM: Final = 25.0
 
 # --- per-source update intervals ------------------------------------------
 # Open-Meteo / CAMS publishes hourly; a free keyless API — never poll faster.
@@ -101,7 +105,7 @@ MAX_UPDATE_INTERVAL_MIN: Final = 24 * 60
 # Sensor.Community exposes ~5-minute readings; poll every 15 min (fresh enough,
 # easy on the free community feed).
 SENSOR_COMMUNITY_UPDATE_INTERVAL_MIN: Final = 15
-# Land Steiermark is daily-mean — poll slowly.
+# Land Steiermark is a slow drift anchor (lagged official feed) — poll slowly.
 LAND_STEIERMARK_UPDATE_INTERVAL_MIN: Final = 12 * 60
 
 
@@ -119,7 +123,11 @@ def new_sources_config() -> dict[str, dict[str, object]]:
             CONF_MAX_DISTANCE_KM: DEFAULT_MAX_DISTANCE_KM,
             CONF_STATIONS: [],
         },
-        SOURCE_LAND_STEIERMARK: {CONF_ENABLED: False, CONF_STATION: ""},
+        SOURCE_LAND_STEIERMARK: {
+            CONF_ENABLED: False,
+            CONF_STATION: "",
+            CONF_MAX_DISTANCE_KM: LAND_STEIERMARK_MAX_DISTANCE_KM,
+        },
     }
 
 

@@ -48,6 +48,7 @@ from .const import (
     DEFAULT_SELECTED_POLLUTANTS,
     DEFAULT_UPDATE_INTERVAL_MIN,
     DOMAIN,
+    LAND_STEIERMARK_MAX_DISTANCE_KM,
     LAND_STEIERMARK_UPDATE_INTERVAL_MIN,
     OPEN_METEO_FORECAST_DAYS,
     OPEN_METEO_PAST_DAYS,
@@ -189,7 +190,13 @@ def build_coordinators(
         from .sources.land_steiermark import LandSteiermarkSource
 
         land_steiermark = LandSteiermarkSource(
-            latitude, longitude, pollutants, station=ls_cfg.get(CONF_STATION) or None
+            latitude,
+            longitude,
+            pollutants,
+            station=ls_cfg.get(CONF_STATION) or None,
+            max_distance_km=ls_cfg.get(
+                CONF_MAX_DISTANCE_KM, LAND_STEIERMARK_MAX_DISTANCE_KM
+            ),
         )
         coordinators[SOURCE_LAND_STEIERMARK] = AirWatchSourceCoordinator(
             hass,
