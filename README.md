@@ -151,6 +151,7 @@ the visual editor, or YAML:
 type: custom:airwatch-card
 title: Air quality          # header title (default: "Air quality")
 expanded_default: false     # start with every row's provenance expanded
+brand_font: false           # opt-in AirWatch brand font (loads a web font); default theme-native
 pollutants:                 # optional subset / explicit order; default = all configured
   - pm2_5
   - pm10
@@ -168,6 +169,11 @@ sources:                    # optional filter for the glance reading; default = 
 | `pollutants` | list | discovered | Which pollutants to show, in order. Blank = all configured. |
 | `sources` | list | all enabled | Restrict the glance reading to these sources (consensus still shows every source). |
 | `expanded_default` | bool | `false` | Expand all provenance on load. |
+| `brand_font` | bool | `false` | Use the AirWatch brand display font (Bricolage) for the title + hero word; loads a web font. Off = fully theme-native (no external request). |
+
+The card is **theme-native**: its surface, text colours and font come from your
+Home Assistant theme (the EEA gauge, severity ramp, glyphs and air accent keep
+their fixed identity). See [`brand/HA_CARD_REVIEW.md`](brand/HA_CARD_REVIEW.md).
 
 ## Roadmap
 

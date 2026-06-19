@@ -86,8 +86,14 @@ Both families are on Google Fonts (free, OFL):
 | Body / UI | Hanken Grotesk | 400 / 500 | line-height 1.5–1.6 |
 | Numeric / status | Hanken Grotesk | 600 | `font-variant-numeric: tabular-nums` |
 
-The card loads these best-effort and falls back to the HA/system sans if they
-fail (offline / CSP).
+**In the Lovelace card, typography is theme-native by default** (per the HA-card
+conventions in [`HA_CARD_REVIEW.md`](HA_CARD_REVIEW.md), "theme for the chrome,
+identity for the content"): all text inherits the user's Home Assistant theme
+font. The Bricolage display face above is **opt-in** (`brand_font: true`) and,
+when enabled, is scoped to only the card title + the hero band word and loaded
+best-effort (falling back to the theme font offline / under CSP). The brand
+typography table here is the design reference for marketing/brand surfaces (the
+brand guide, wordmark, repo banner) — not forced onto the in-dashboard card.
 
 ### Radius, spacing, surfaces (unchanged)
 ```

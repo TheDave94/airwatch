@@ -55,7 +55,11 @@
   --aw-grain-stroke: var(--aw-ink);   /* outline + detail (legible on any band) */
   --aw-grain-fill:   #E8EBEE;         /* body fill (washed with the band colour) */
 
-  /* ── Typography (transfers unchanged: Bricolage display / Hanken text) ── */
+  /* ── Typography (brand reference for wordmark / brand surfaces) ──
+   * NOTE: the Lovelace card is theme-native — it INHERITS the Home Assistant
+   * theme font for all text. The Bricolage display face is opt-in there
+   * (brand_font: true), scoped to the card title + hero word. These tokens
+   * document the brand typeface for marketing/brand artefacts. */
   --aw-font-display: "Bricolage Grotesque", system-ui, sans-serif;  /* wordmark / headings */
   --aw-font-text:    "Hanken Grotesk", system-ui, sans-serif;       /* body / UI / numeric */
 

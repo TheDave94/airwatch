@@ -2,12 +2,19 @@
  * airwatch-card.js — Lovelace custom card for AirWatch.
  *
  * Visual identity ADAPTED from the PollenWatch design system (the family
- * resemblance is deliberate): Bricolage Grotesque + Hanken Grotesk typography,
- * the neutral paper/cloud/ink palette, the card anatomy (mark · title · meta →
- * hero gauge → reading → breakdown rows), the status-pill treatment, and the
+ * resemblance is deliberate): the card anatomy (mark · title · meta → hero
+ * gauge → reading → breakdown rows), the status-pill treatment, and the
  * categorical severity GAUGE mechanics — needle resting at a segment centre
  * (never an interpolated value), "higher is worse", calm motion, and
  * gray-never-green for empty readings. See brand/README.md + brand/tokens.css.
+ *
+ * THEME-NATIVE chrome ("theme for the chrome, identity for the content", per
+ * the Mushroom/Bubble precedent — see brand/HA_CARD_REVIEW.md): the surface,
+ * text colours and typography all come from Home Assistant's theme (the
+ * <ha-card> owns the surface; text inherits the theme font). The card's
+ * identity lives in the CONTENT — the EEA gauge, the severity ramp, the
+ * pollutant glyphs, the air accent — which never theme-shift. The Bricolage
+ * brand face is opt-in (brand_font: true), scoped to the title + hero word.
  *
  * Domain swaps for air quality:
  *   - Severity ramp = the official EEA 6-band air-quality ramp (the
@@ -147,10 +154,11 @@
     }
   }
 
-  // ── Web-font loading (best-effort; degrades to the system stack) ─────
-  // The card's typography is Bricolage Grotesque + Hanken Grotesk (Google
-  // Fonts, OFL). Inject the stylesheet once per document; if it fails (offline,
-  // CSP), the font tokens fall back to the HA/system sans so nothing breaks.
+  // ── Brand web-font loading — OPT-IN only (brand_font: true) ──────────
+  // Default is theme-native (no external request). When the user opts in, the
+  // Bricolage display face is fetched once per document and applied (scoped to
+  // the title + hero word via .brand-font); if the fetch fails (offline, CSP),
+  // those elements fall back to the theme font, so nothing breaks.
   let _fontsInjected = false;
   function ensureFonts() {
     if (_fontsInjected) return;
@@ -165,7 +173,7 @@
         return l;
       };
       const css = mk('stylesheet',
-        'https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Hanken+Grotesk:wght@400;500;600;700&display=swap');
+        'https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&display=swap');
       css.setAttribute('data-aw-fonts', '');
       head.append(
         mk('preconnect', 'https://fonts.googleapis.com'),
@@ -328,10 +336,14 @@
     const [nx, ny] = gpt(GA.R - 9, deg);
     return `<path class="aw-needle" d="M${GA.CX} ${GA.CY} L${gf(nx)} ${gf(ny)}" stroke="${SLATE}" stroke-width="3.6" stroke-linecap="round"/>`;
   }
-  // band: 1..6 → active band; null → unknown (resting, no needle).
-  function awGauge(band) {
+  // band: 1..6 → active band; null → unknown (resting, no needle). `label`
+  // is the screen-reader summary of the reading (a11y — the dial is role="img"
+  // with a <title>). Callers pass an already-escaped label.
+  function awGauge(band, label) {
     const B = gBounds();
-    const open = `<svg class="aw-gauge" viewBox="0 0 120 ${GA.VH}" xmlns="http://www.w3.org/2000/svg">`;
+    const attrs = label ? ` role="img" aria-label="${label}"` : '';
+    const title = label ? `<title>${label}</title>` : '';
+    const open = `<svg class="aw-gauge" viewBox="0 0 120 ${GA.VH}" xmlns="http://www.w3.org/2000/svg"${attrs}>${title}`;
     if (!band) {
       return `${open}${
         gArc(-GA.H, GA.H, UNKNOWN_COLOUR, GA.W, 0.9, '1.5 5')
@@ -362,22 +374,17 @@
       /* Per-glyph tint (color-neutral SVGs read these). */
       --aw-grain-stroke: var(--aw-ink);
       --aw-grain-fill: var(--aw-edge);
-      /* Type — Bricolage display / Hanken text, with safe system fallbacks. */
-      --aw-font-display: "Bricolage Grotesque", var(--ha-card-header-font-family, system-ui), sans-serif;
-      --aw-font-text: "Hanken Grotesk", var(--primary-font-family, system-ui), sans-serif;
-      --aw-r-card: var(--ha-card-border-radius, 16px);
+      /* Typography is THEME-NATIVE: all text inherits Home Assistant's font.
+         The brand display face (Bricolage) is opt-in (brand_font: true) and
+         scoped to the title + hero word only — see .card.brand-font below. */
       --aw-r-pill: 999px;
       display: block;
     }
-    .card {
-      background: var(--aw-cloud);
-      border: 1px solid var(--aw-edge);
-      border-radius: var(--aw-r-card);
-      padding: 16px 18px 14px;
-      color: var(--aw-ink);
-      box-shadow: var(--ha-card-box-shadow, none);
-      font-family: var(--aw-font-text);
-    }
+    /* The surface (background, border, radius, shadow) is owned by <ha-card> so
+       it matches the user's theme — we add only padding + internal layout.
+       Identity lives in the CONTENT (EEA gauge, ramp, glyphs, accent), not the
+       chrome. */
+    .card { padding: 16px 18px 14px; }
 
     /* ── header: mark · title · meta ── */
     .header { display: flex; align-items: center; gap: 14px; }
@@ -385,16 +392,23 @@
     .mark svg { width: 100%; height: 100%; display: block; }
     .titles { min-width: 0; }
     .title {
-      font-family: var(--aw-font-display); font-weight: 600; font-size: 18px;
+      font-weight: 600; font-size: 18px;
       letter-spacing: -0.015em; line-height: 1.15;
     }
     .submeta { font-size: 12.5px; color: var(--aw-muted); margin-top: 1px; }
     .meta { margin-left: auto; display: flex; align-items: center; }
     .badge {
-      font-family: var(--aw-font-text); font-variant-numeric: tabular-nums;
+      font-variant-numeric: tabular-nums;
       font-weight: 600; font-size: 12.5px; color: var(--aw-ink);
       padding: 3px 9px; border-radius: var(--aw-r-pill);
       background: var(--aw-edge);
+    }
+    /* Opt-in brand display face — scoped to ONLY the title + hero band word, so
+       even when enabled the rest of the card stays on the theme font. Loaded
+       best-effort (see ensureFonts); off by default → no external request. */
+    .card.brand-font .title,
+    .card.brand-font .reading .level {
+      font-family: "Bricolage Grotesque", var(--ha-card-header-font-family, inherit);
     }
 
     /* ── hero: gauge + reading (even vertical rhythm) ── */
@@ -408,7 +422,7 @@
     .aw-needle, .hub { transition: opacity 200ms; }
     .reading { text-align: center; }
     .reading .level {
-      font-family: var(--aw-font-display); font-weight: 700; font-size: 30px;
+      font-weight: 700; font-size: 30px;
       line-height: 1; letter-spacing: -0.02em; transition: color 200ms;
     }
     .reading .cap {
@@ -453,7 +467,7 @@
     .pill {
       display: inline-flex; align-items: center; gap: 7px;
       padding: 5px 12px 5px 10px; border-radius: var(--aw-r-pill);
-      font-family: var(--aw-font-text); font-weight: 600; font-size: 12px;
+      font-weight: 600; font-size: 12px;
       white-space: nowrap;
     }
     .pill .pdot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
@@ -475,7 +489,7 @@
     .detail-block { margin-top: 12px; }
     .detail-block:first-child { margin-top: 4px; }
     .detail-h {
-      font-family: var(--aw-font-display); font-weight: 600;
+      font-weight: 600;
       font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
       color: var(--aw-muted); margin-bottom: 6px;
     }
@@ -501,7 +515,7 @@
     /* ── footer ── */
     .footer { margin-top: 12px; display: flex; justify-content: center; }
     .toggle-all {
-      font-family: var(--aw-font-text); font-weight: 600; font-size: 11px;
+      font-weight: 600; font-size: 11px;
       letter-spacing: 0.08em; text-transform: uppercase;
       color: var(--aw-muted); background: transparent;
       border: 1px solid var(--aw-edge); border-radius: var(--aw-r-pill);
@@ -524,7 +538,9 @@
     }
 
     connectedCallback() {
-      ensureFonts();
+      // Only fetch the brand webfont when the user opted in (brand_font: true);
+      // theme-native is the default and makes no external request.
+      if (this._config?.brand_font) ensureFonts();
     }
 
     setConfig(config) {
@@ -549,7 +565,7 @@
       this._discoveredPollutants = null;
       this._discoveryPromise = null;
       this._built = false;
-      ensureFonts();
+      if (this._config.brand_font) ensureFonts();
       this._build();
     }
 
@@ -563,6 +579,21 @@
     getCardSize() {
       const n = this._resolvePollutantKeys().length || 4;
       return 4 + n;
+    }
+
+    // Sections-view sizing (12-column grid; ~30px×56px cells). This is a rich
+    // multi-metric card, so it defaults to full width but can go down to half;
+    // height scales with the pollutant count (header + gauge + rows + footer),
+    // with a sensible floor and ceiling. getCardSize above stays the masonry
+    // fallback for the legacy layout.
+    getGridOptions() {
+      const n = this._resolvePollutantKeys().length || 6;
+      return {
+        columns: 12,
+        min_columns: 6,
+        rows: Math.max(6, Math.min(13, 5 + Math.ceil(n * 0.8))),
+        min_rows: 5,
+      };
     }
 
     static getStubConfig() {
@@ -624,9 +655,10 @@
     }
 
     _build() {
+      const brandClass = this._config.brand_font ? ' brand-font' : '';
       this.shadowRoot.innerHTML = `
         <style>${CARD_CSS}</style>
-        <ha-card class="card" data-card>
+        <ha-card class="card${brandClass}" data-card>
           <div class="header">
             <span class="mark">${AW_MARK}</span>
             <div class="titles">
@@ -748,14 +780,15 @@
       if (!worst) {
         // Fail-safe: no EAQI sub-index reading → resting/unknown gauge, never
         // a fake green.
-        gaugeEl.innerHTML = awGauge(null);
+        gaugeEl.innerHTML = awGauge(null, 'Air quality: unknown — no current index reading');
         readingEl.innerHTML =
           `<div class="level" style="color:var(--aw-muted)">Unknown</div>` +
           `<div class="cap">No current air-quality index reading</div>`;
         return;
       }
       const { r, sev } = worst;
-      gaugeEl.innerHTML = awGauge(sev.band);
+      const a11y = this._esc(`Air quality: ${sev.label} — worst sub-index ${r.name}`);
+      gaugeEl.innerHTML = awGauge(sev.band, a11y);
       readingEl.innerHTML =
         `<div class="level" style="color:${sev.colour}">${this._esc(sev.label)}</div>` +
         `<div class="cap">Overall · worst sub-index ${this._esc(r.formula)}</div>`;
@@ -946,6 +979,7 @@
       return [
         { name: 'title', selector: { text: {} } },
         { name: 'expanded_default', selector: { boolean: {} } },
+        { name: 'brand_font', selector: { boolean: {} } },
         {
           name: 'pollutants',
           selector: {
@@ -982,6 +1016,7 @@
       form.computeLabel = (s) => ({
         title: 'Card title',
         expanded_default: 'Expand provenance by default',
+        brand_font: 'Use the AirWatch brand font (Bricolage; loads a web font)',
         pollutants: 'Pollutants (blank = all configured)',
         sources: 'Sources (blank = all enabled)',
       }[s.name] || s.name);
