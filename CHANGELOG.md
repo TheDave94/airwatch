@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2](https://github.com/TheDave94/airwatch/compare/v1.0.1...v1.0.2) (2026-06-19)
+
+
+### Bug Fixes
+
+* **docs:** README polish + info.md; demote internal dev docs ([1afb47e](https://github.com/TheDave94/airwatch/commit/1afb47e87374ba41136f31d940889a915cfc6cb9))
+
 ## [1.0.1](https://github.com/TheDave94/airwatch/compare/v1.0.0...v1.0.1) (2026-06-19)
 
 

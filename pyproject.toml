@@ -1,6 +1,6 @@
 [project]
 name = "airwatch"
-version = "1.0.1"
+version = "1.0.2"
 description = "Multi-source European air-quality aggregator for Home Assistant"
 readme = "README.md"
 license = { file = "LICENSE" }
