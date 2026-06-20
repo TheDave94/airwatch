@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.3](https://github.com/TheDave94/airwatch/compare/v1.0.2...v1.0.3) (2026-06-20)
+
+
+### Miscellaneous Chores
+
+* release 1.0.3 ([53e9687](https://github.com/TheDave94/airwatch/commit/53e9687ce3f2370ef4fb9dead51636544f917aad))
+
 ## [1.0.2](https://github.com/TheDave94/airwatch/compare/v1.0.1...v1.0.2) (2026-06-19)
 
 
