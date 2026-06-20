@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/TheDave94/airwatch/compare/v1.0.3...v1.1.0) (2026-06-20)
+
+
+### Features
+
+* overall worst-sub-index consensus entity ([#6](https://github.com/TheDave94/airwatch/issues/6)) ([6af1c5a](https://github.com/TheDave94/airwatch/commit/6af1c5ab32b703a8e64ab1c3a42c468c43c9652a))
+
 ## [1.0.3](https://github.com/TheDave94/airwatch/compare/v1.0.2...v1.0.3) (2026-06-20)
 
 
