@@ -211,7 +211,7 @@ their fixed identity). See [`brand/HA_CARD_REVIEW.md`](brand/HA_CARD_REVIEW.md).
 | | |
 |---|---|
 | Open-Meteo / CAMS primary source | ✅ implemented, live-verified |
-| Coordinators · config flow · entities (raw / percentile / consensus / divergence) | ✅ implemented |
+| Coordinators · config flow · entities (raw / percentile / consensus / divergence / overall) | ✅ implemented |
 | Pollutant registry · WHO + EAQI bands · provenance | ✅ implemented |
 | Governance (cleanroom no-loss gates · release-please · CI) | ✅ ported |
 | Sensor.Community secondary source (fault-rejecting, consensus-enabled) | ✅ implemented, live-verified |

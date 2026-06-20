@@ -11,6 +11,7 @@ from custom_components.airwatch.analytics import (
     daily_peaks,
     level_for_source,
     level_label,
+    overall_consensus,
     percentile_rank,
     recent_percentile_from_series,
 )
@@ -261,3 +262,90 @@ def test_level_label_maps_levels_and_passes_through_none(level, expected):
 
 def test_level_labels_table():
     assert LEVEL_LABELS == {0: "good", 1: "elevated", 2: "high"}
+
+
+# --- overall (worst-sub-index) aggregate ----------------------------------
+
+
+def test_overall_worst_agreed_subindex_and_worst_pollutant():
+    res = overall_consensus(
+        {
+            "pm2_5": consensus({"open_meteo": 0, "sensor_community": 0}),  # good
+            "ozone": consensus({"open_meteo": 2, "land_steiermark": 2}),  # high
+            "nitrogen_dioxide": consensus({"a": 1, "b": 1}),  # elevated
+        }
+    )
+    assert res.state == "high"
+    assert res.level == 2
+    assert res.level_label == "high"
+    assert res.worst_pollutant == "ozone"
+    assert res.diverged_pollutants == []
+    assert res.pollutant_count == 3
+
+
+def test_overall_mixed_pollutant_excluded_from_max_and_listed():
+    # ozone diverges (>1 level apart) — it has no agreed level, so it must NOT
+    # set the headline; pm2_5's elevated wins, ozone is recorded as diverged.
+    res = overall_consensus(
+        {
+            "pm2_5": consensus({"a": 1, "b": 1}),  # elevated
+            "ozone": consensus({"a": 0, "b": 2}),  # mixed
+        }
+    )
+    assert res.state == "elevated"
+    assert res.level == 1
+    assert res.worst_pollutant == "pm2_5"
+    assert res.diverged_pollutants == ["ozone"]
+    assert res.pollutant_count == 2
+
+
+def test_overall_only_divergence_yields_mixed_no_level():
+    res = overall_consensus({"ozone": consensus({"a": 0, "b": 2})})  # mixed only
+    assert res.state == "mixed"
+    assert res.level is None
+    assert res.level_label is None
+    assert res.worst_pollutant is None
+    assert res.diverged_pollutants == ["ozone"]
+
+
+def test_overall_no_contributing_pollutant_is_unavailable():
+    assert overall_consensus({}).state is None
+    # a 0-source consensus contributes nothing
+    res = overall_consensus({"pm2_5": consensus({}, max_possible=3)})
+    assert res.state is None
+    assert res.pollutant_count == 0
+
+
+def test_overall_tie_breaks_to_first_pollutant_in_order():
+    res = overall_consensus(
+        {
+            "pm2_5": consensus({"a": 2, "b": 2}),  # high
+            "ozone": consensus({"a": 2, "b": 2}),  # high
+        }
+    )
+    assert res.level == 2
+    assert res.worst_pollutant == "pm2_5"  # first at the worst level
+
+
+def test_overall_single_source_pollutant_contributes_its_level():
+    res = overall_consensus(
+        {
+            "pm2_5": consensus({"open_meteo": 0, "sensor_community": 0}),  # good
+            "carbon_monoxide": consensus({"open_meteo": 2}, max_possible=2),  # high, 1 src
+        }
+    )
+    assert res.state == "high"
+    assert res.worst_pollutant == "carbon_monoxide"
+    assert res.diverged_pollutants == []
+
+
+def test_overall_all_good():
+    res = overall_consensus(
+        {
+            "pm2_5": consensus({"a": 0, "b": 0}),
+            "ozone": consensus({"a": 0, "b": 0}),
+        }
+    )
+    assert res.state == "good"
+    assert res.level == 0
+    assert res.level_label == "good"

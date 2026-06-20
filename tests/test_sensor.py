@@ -207,3 +207,65 @@ async def test_consensus_sensor_has_source_count_badge(
     assert consensus is not None
     assert consensus.attributes["source_count"] == 1
     assert "max_possible_sources" in consensus.attributes
+
+
+# --- overall (worst-sub-index) sensor -------------------------------------
+
+
+def _payload_eaqi_high() -> dict:
+    """european_aqi high (90 -> level 2) while pm2_5 + CO stay good.
+
+    Proves the overall worst-sub-index EXCLUDES the european_aqi composite: the
+    european_aqi consensus reads "high", but the overall stays "good".
+    """
+    now = dt_util.now().replace(minute=0, second=0, microsecond=0)
+    start = now - timedelta(days=1)
+    times = [
+        (start + timedelta(hours=6 * i)).strftime("%Y-%m-%dT%H:00") for i in range(12)
+    ]
+    current_vals = {"pm2_5": 12.0, "carbon_monoxide": 250.0, "european_aqi": 90.0}
+    hourly = {"time": times}
+    current = {"time": now.strftime("%Y-%m-%dT%H:00")}
+    units = {}
+    for p in _POLLUTANTS:
+        hourly[p] = [current_vals[p] for _ in times]
+        current[p] = current_vals[p]
+        units[p] = "" if p == "european_aqi" else "µg/m³"
+    return {
+        "latitude": 48.2, "longitude": 16.4, "timezone": "Europe/Vienna",
+        "elevation": 363.0, "hourly_units": units, "current": current,
+        "hourly": hourly,
+    }
+
+
+async def test_overall_sensor_present_with_worst_subindex(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    await _setup(hass, aioclient_mock)
+    overall = hass.states.get("sensor.airwatch_analytics_overall")
+    assert overall is not None
+    # pm2_5 (12 -> good) and CO (250 -> good) both agree good; overall = good.
+    assert overall.state == "good"
+    assert overall.attributes["level_label"] == "good"
+    assert overall.attributes["worst_pollutant"] == "pm2_5"
+    assert overall.attributes["diverged_pollutants"] == []
+
+
+async def test_overall_sensor_excludes_european_aqi_from_worst_of(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    aioclient_mock.get(BASE_URL, json=_payload_eaqi_high())
+    entry = _entry()
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert entry.state is ConfigEntryState.LOADED
+    # european_aqi's own consensus IS high...
+    eaqi = hass.states.get("sensor.airwatch_analytics_european_aqi_consensus")
+    assert eaqi is not None
+    assert eaqi.state == "high"
+    # ...but it's a parallel composite, so the overall worst-of ignores it.
+    overall = hass.states.get("sensor.airwatch_analytics_overall")
+    assert overall is not None
+    assert overall.state == "good"
+    assert overall.attributes["worst_pollutant"] == "pm2_5"
