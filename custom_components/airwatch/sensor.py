@@ -32,8 +32,10 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .analytics import (
     CONSENSUS_OPTIONS,
+    OverallResult,
     daily_peaks,
     level_for_source,
+    overall_consensus,
 )
 from .analytics import (
     level_label as _level_label,
@@ -42,6 +44,7 @@ from .const import (
     ATTR_BANDS,
     ATTR_CO_PPM,
     ATTR_CO_PPM_NOTE,
+    ATTR_DIVERGED_POLLUTANTS,
     ATTR_FORECAST,
     ATTR_GRID_SHIFT_KM,
     ATTR_LAST_UPDATED,
@@ -54,6 +57,7 @@ from .const import (
     ATTR_SNAPPED_LON,
     ATTR_SOURCE_COUNT,
     ATTR_STATION,
+    ATTR_WORST_POLLUTANT,
     ATTRIBUTION_CAMS,
     DOMAIN,
     FORECAST_DAYS,
@@ -163,11 +167,17 @@ async def async_setup_entry(
         covered_pollutants = all_covered_pollutants(runtime.coordinators)
         for pollutant in covered_pollutants:
             entities.append(ConsensusSensor(analytics, entry, pollutant))
+        # One overall (worst-sub-index) headline across the covered pollutants.
+        if covered_pollutants:
+            entities.append(OverallConsensusSensor(analytics, entry))
 
     # Prune stale consensus sensors for pollutants no longer covered (e.g. user
     # disabled the only source covering a pollutant). Same orphan story as
     # above, applied to the analytics device.
     _async_remove_orphan_analytics(hass, entry, set(covered_pollutants), "consensus")
+    # The overall sensor has no pollutant key; prune it when nothing is covered.
+    if not covered_pollutants:
+        _async_remove_overall(hass, entry)
 
     async_add_entities(entities)
 
@@ -189,6 +199,22 @@ def _async_remove_orphan_analytics(
             pollutant = reg_entry.unique_id[len(prefix):]
             if pollutant not in active_pollutants:
                 registry.async_remove(reg_entry.entity_id)
+
+
+@callback
+def _async_remove_overall(
+    hass: HomeAssistant, entry: AirWatchConfigEntry
+) -> None:
+    """Remove the overall (worst-sub-index) sensor when nothing is covered.
+
+    It has no pollutant key, so the per-pollutant orphan loop never reaches it.
+    """
+    registry = er.async_get(hass)
+    unique_id = f"{entry.entry_id}_overall"
+    for reg_entry in er.async_entries_for_config_entry(registry, entry.entry_id):
+        if reg_entry.unique_id == unique_id:
+            registry.async_remove(reg_entry.entity_id)
+            return
 
 
 @callback
@@ -427,6 +453,68 @@ class ConsensusSensor(
             ATTR_SOURCE_LEVELS: result.source_levels,
             ATTR_SOURCE_COUNT: result.source_count,
             ATTR_MAX_SOURCES: result.max_possible,
+        }
+
+
+class OverallConsensusSensor(
+    CoordinatorEntity[AirWatchAnalyticsCoordinator], SensorEntity
+):
+    """Overall air quality — the worst agreed per-pollutant sub-index.
+
+    Reduces the per-pollutant consensus map to one headline level
+    (good/elevated/high), using the worst-of-sub-indices rule the EAQI itself
+    uses. The ``european_aqi`` composite is excluded (it is a parallel overall
+    index from a single source, not a sub-index). Divergent pollutants do NOT
+    move the headline — they are listed in ``diverged_pollutants`` so the
+    dashboard can flag disagreement without it being averaged away. State is
+    "mixed" only when no pollutant has an agreed level but at least one diverges.
+    """
+
+    _attr_has_entity_name = True
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = CONSENSUS_OPTIONS
+    _attr_icon = "mdi:air-filter"
+
+    def __init__(
+        self,
+        coordinator: AirWatchAnalyticsCoordinator,
+        entry: AirWatchConfigEntry,
+    ) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{entry.entry_id}_overall"
+        self._attr_translation_key = "overall"
+        self._attr_name = "Overall air quality"
+        # Canonical-key entity_id: sensor.airwatch_analytics_overall.
+        self.entity_id = f"sensor.{DOMAIN}_analytics_overall"
+        self._attr_device_info = analytics_device_info(entry)
+
+    def _result(self) -> OverallResult:
+        # Exclude european_aqi (a parallel composite, not a sub-index) and pass
+        # the rest in canonical order so worst_pollutant ties break stably.
+        consensus_map = self.coordinator.data.consensus
+        ordered = {
+            pollutant: consensus_map[pollutant]
+            for pollutant in CANONICAL_POLLUTANTS
+            if pollutant in consensus_map and pollutant != "european_aqi"
+        }
+        return overall_consensus(ordered)
+
+    @property
+    def available(self) -> bool:
+        return super().available and self._result().state is not None
+
+    @property
+    def native_value(self) -> str | None:
+        return self._result().state
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        result = self._result()
+        return {
+            ATTR_LEVEL: result.level,
+            ATTR_LEVEL_LABEL: result.level_label,
+            ATTR_WORST_POLLUTANT: result.worst_pollutant,
+            ATTR_DIVERGED_POLLUTANTS: result.diverged_pollutants,
         }
 
 

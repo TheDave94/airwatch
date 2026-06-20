@@ -175,3 +175,6 @@ ATTR_CO_PPM_NOTE: Final = "ppm_conversion_note"
 # Cross-source consensus source-count badge.
 ATTR_SOURCE_COUNT: Final = "source_count"
 ATTR_MAX_SOURCES: Final = "max_possible_sources"
+# Overall (worst-sub-index) aggregate attributes.
+ATTR_WORST_POLLUTANT: Final = "worst_pollutant"
+ATTR_DIVERGED_POLLUTANTS: Final = "diverged_pollutants"

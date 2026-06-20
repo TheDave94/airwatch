@@ -209,6 +209,68 @@ def consensus(levels: dict[str, int], max_possible: int = 0) -> ConsensusResult:
     )
 
 
+@dataclass(slots=True)
+class OverallResult:
+    """Worst-sub-index across pollutants — the overall air-quality headline.
+
+    The overall index is the worst AGREED per-pollutant sub-index (the same
+    worst-of-sub-indices logic the EAQI uses). A ``mixed`` (diverged) pollutant
+    has no agreed level, so it is EXCLUDED from the max and recorded in
+    ``diverged_pollutants`` instead — divergence is surfaced separately, never
+    silently averaged into the headline.
+
+    State semantics:
+    - some pollutant has an agreed level → ``state`` is that worst label
+      (good/elevated/high), ``level`` its int, ``worst_pollutant`` the key.
+    - no agreed level but >=1 diverged → ``state`` = "mixed", ``level`` None.
+    - no contributing pollutant at all → ``state`` None (sensor unavailable).
+    """
+
+    state: str | None              # one of CONSENSUS_OPTIONS, or None
+    level: int | None              # worst agreed 0/1/2; None for mixed/no-data
+    level_label: str | None        # label of the worst agreed level, or None
+    worst_pollutant: str | None    # pollutant key at the worst agreed level
+    diverged_pollutants: list[str]  # pollutants whose consensus is "mixed"
+    pollutant_count: int           # contributing pollutants (agreed or diverged)
+
+
+def overall_consensus(results: dict[str, ConsensusResult]) -> OverallResult:
+    """Aggregate per-pollutant :class:`ConsensusResult` into the overall index.
+
+    ``results`` must already EXCLUDE the ``european_aqi`` composite — it is a
+    parallel overall index from a single source, not an individual sub-index, so
+    folding it into a worst-of would double-count. The caller should pass the
+    dict in canonical pollutant order; ``worst_pollutant`` ties break to the
+    first pollutant at the worst level in that order.
+    """
+    agreed: list[tuple[str, int]] = []  # (pollutant, level)
+    diverged: list[str] = []
+    for pollutant, result in results.items():
+        if result is None or result.source_count == 0 or result.state is None:
+            continue
+        if result.diverged:
+            diverged.append(pollutant)
+        elif result.level is not None:
+            agreed.append((pollutant, result.level))
+    pollutant_count = len(agreed) + len(diverged)
+    if agreed:
+        worst_level = max(level for _, level in agreed)
+        worst_pollutant = next(p for p, level in agreed if level == worst_level)
+        return OverallResult(
+            _LEVEL_TO_CONSENSUS[worst_level],
+            worst_level,
+            LEVEL_LABELS[worst_level],
+            worst_pollutant,
+            diverged,
+            pollutant_count,
+        )
+    if diverged:
+        return OverallResult(
+            CONSENSUS_MIXED, None, None, None, diverged, pollutant_count
+        )
+    return OverallResult(None, None, None, None, [], 0)
+
+
 def recent_percentile_from_series(
     times: list[str],
     values: list[float | None],
