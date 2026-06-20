@@ -1,0 +1,13 @@
+{
+  "name": "airwatch-screenshots",
+  "private": true,
+  "type": "module",
+  "description": "Dev-only screenshot harness for the AirWatch card (not shipped to users).",
+  "scripts": {
+    "screenshots": "python3 gen.py && node shoot.mjs",
+    "shoot": "node shoot.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.60.0"
+  }
+}

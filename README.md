@@ -139,13 +139,13 @@ card automatically on first load, so it appears in the card picker after a refre
 
 | Light theme | Dark theme |
 |---|---|
-| ![AirWatch card, light theme](brand/assets/screenshots/card-light.png) | ![AirWatch card, dark theme](brand/assets/screenshots/card-dark.png) |
+| ![AirWatch card, light theme](docs/images/collapsed-light.png) | ![AirWatch card, dark theme](docs/images/collapsed-dark.png) |
 
 The chrome is **theme-native** — surface, text and font come from your Home
 Assistant theme, while the EEA gauge, severity ramp and pollutant glyphs keep their
 fixed identity on any theme:
 
-![AirWatch card on a custom theme](brand/assets/screenshots/card-custom-theme.png)
+![AirWatch card on a custom theme](docs/images/collapsed-custom.png)
 
 The card follows a **progressive-disclosure** model:
 
@@ -165,6 +165,12 @@ It handles the states the data layer actually produces: a stale or all-invalid
 source reads as **Unknown** (the fail-safe, never a fake green), a disabled source
 (Land Steiermark is off by default) simply drops out of the consensus, and missing
 pollutants are omitted.
+
+Expanded — the on-tap depth: per-pollutant WHO 2021 / EU 2024-2881 bands,
+classic-vs-revised EEA divergence, and cross-source consensus. Carbon monoxide
+sits on its WHO/EU basis (no EAQI band) — the honest odd-one-out:
+
+![AirWatch card expanded, showing multi-authority provenance](docs/images/expanded-light.png)
 
 ### Card configuration
 
@@ -244,6 +250,19 @@ Issues and pull requests are welcome — open an
 [issue](https://github.com/TheDave94/airwatch/issues) for bugs or feature ideas.
 For local development the unit suite lives under `tests/` (run with `pytest`),
 and the [cleanroom no-loss harness](cleanroom/) is used as a release gate.
+
+## Related projects
+
+AirWatch works on its own, and is also deliberately built to work alongside:
+
+- **[PollenWatch](https://github.com/TheDave94/pollenwatch)** — the companion
+  **pollen** integration AirWatch's architecture is modelled on (multi-source
+  aggregation, cross-source consensus/divergence, the bundled severity-card
+  pattern). AirWatch's card was derived from PollenWatch's design, so the two read
+  consistently side by side.
+- **[Oriel Dashboard](https://github.com/TheDave94/oriel-dashboard)** — a Lovelace
+  dashboard strategy. It renders a first-party PollenWatch card today; a matching
+  first-party **AirWatch** air-quality card is *planned* (not yet shipped).
 
 ## License
 
