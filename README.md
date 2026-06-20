@@ -261,8 +261,10 @@ AirWatch works on its own, and is also deliberately built to work alongside:
   pattern). AirWatch's card was derived from PollenWatch's design, so the two read
   consistently side by side.
 - **[Oriel Dashboard](https://github.com/TheDave94/oriel-dashboard)** — a Lovelace
-  dashboard strategy. It renders a first-party PollenWatch card today; a matching
-  first-party **AirWatch** air-quality card is *planned* (not yet shipped).
+  dashboard strategy. It **auto-detects** AirWatch and renders a first-party
+  air-quality card — worst sub-index, per-pollutant consensus, an N-of-M source
+  badge, and explicit divergence (read from the `*_divergence` binary sensors) —
+  with no manual card configuration, alongside its matching PollenWatch card.
 
 ## License
 
