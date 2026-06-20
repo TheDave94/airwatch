@@ -23,11 +23,14 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 
-from custom_components.airwatch.sources.pollutant_registry import (  # noqa: E402
-    level_for_value,
-    band_provenance,
+from custom_components.airwatch.analytics import (  # noqa: E402
+    consensus,
+    level_label,
 )
-from custom_components.airwatch.analytics import consensus, level_label  # noqa: E402
+from custom_components.airwatch.sources.pollutant_registry import (  # noqa: E402
+    band_provenance,
+    level_for_value,
+)
 
 OUT = Path(__file__).resolve().parent / "states.json"
 
@@ -41,12 +44,15 @@ UNIT = "µg/m³"
 # pollutant -> {source: value µg/m³}. Coverage mirrors reality:
 #   Sensor.Community = PM only; Land = everything but european_aqi; Open-Meteo = all.
 SCEN = {
-    "pm2_5":            {"open_meteo": 4,   "sensor_community": 135, "land_steiermark": 16},  # divergence: clean 4 vs local spike 135
-    "pm10":             {"open_meteo": 44,  "sensor_community": 51,  "land_steiermark": 47},  # 3-source agreement, elevated
+    # divergence: clean 4 vs local spike 135
+    "pm2_5":            {"open_meteo": 4,   "sensor_community": 135, "land_steiermark": 16},
+    # 3-source agreement, elevated
+    "pm10":             {"open_meteo": 44,  "sensor_community": 51,  "land_steiermark": 47},
     "nitrogen_dioxide": {"open_meteo": 58,  "land_steiermark": 49},
     "ozone":            {"open_meteo": 132, "land_steiermark": 119},
     "sulphur_dioxide":  {"open_meteo": 9,   "land_steiermark": 12},
-    "carbon_monoxide":  {"open_meteo": 210, "land_steiermark": 185},  # honest: band_provenance has no EAQI authority
+    # honest: band_provenance has no EAQI authority
+    "carbon_monoxide":  {"open_meteo": 210, "land_steiermark": 185},
     "european_aqi":     {"open_meteo": 63},
 }
 # global ceilings: how many sources GLOBALLY can cover each pollutant
