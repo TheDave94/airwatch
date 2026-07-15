@@ -206,7 +206,10 @@ async def test_consensus_sensor_has_source_count_badge(
     consensus = hass.states.get("sensor.airwatch_analytics_pm2_5_consensus")
     assert consensus is not None
     assert consensus.attributes["source_count"] == 1
-    assert "max_possible_sources" in consensus.attributes
+    # Assert the actual denominator, not just presence: pm2_5 is covered by
+    # three registry sources (open_meteo + sensor_community + land_steiermark),
+    # so the n/m badge ceiling is 3 even with a single active source here.
+    assert consensus.attributes["max_possible_sources"] == 3
 
 
 # --- overall (worst-sub-index) sensor -------------------------------------

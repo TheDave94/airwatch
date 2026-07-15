@@ -22,6 +22,7 @@ from .const import DOMAIN, PLATFORMS
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
+    from homeassistant.helpers.device_registry import DeviceEntry
 
     from .coordinator import AirWatchConfigEntry
 
@@ -37,6 +38,7 @@ _CARD_LOADED_KEY = "airwatch_card_registered"
 
 __all__ = [
     "DOMAIN",
+    "async_remove_config_entry_device",
     "async_setup_entry",
     "async_unload_entry",
 ]
@@ -50,7 +52,6 @@ async def _async_register_card(hass: HomeAssistant) -> None:
     # harnesses that don't load the http component) — no-op there.
     if getattr(hass, "http", None) is None:
         return
-    hass.data[_CARD_LOADED_KEY] = True
 
     from homeassistant.components.frontend import add_extra_js_url
     from homeassistant.components.http import StaticPathConfig
@@ -65,20 +66,33 @@ async def _async_register_card(hass: HomeAssistant) -> None:
 
     # Cache-bust via manifest version so a HACS update reloads the JS in the
     # browser. Read in an executor — sync I/O on the event loop trips HA's
-    # blocking-call detector.
+    # blocking-call detector. Catch ValueError too: a partially-written manifest
+    # (e.g. an interrupted HACS update) raises JSONDecodeError, which must not
+    # take down the whole config-entry setup over a cosmetic cache-buster.
     def _read_version() -> str:
         try:
             data = json.loads((Path(__file__).parent / "manifest.json").read_text())
             return data.get("version", "0")
-        except OSError:
+        except (OSError, ValueError):
             return "0"
 
     version = await hass.async_add_executor_job(_read_version)
 
-    await hass.http.async_register_static_paths(
-        [StaticPathConfig(_CARD_URL_BASE, str(frontend_dir), False)]
-    )
-    add_extra_js_url(hass, f"{_CARD_URL_BASE}/{_CARD_FILE}?v={version}")
+    # Latch AFTER a fully-successful registration, not before: an exception in
+    # the register calls must not both fail the entry and leave the latch set
+    # (which would silently skip the card on every later reload this boot).
+    try:
+        await hass.http.async_register_static_paths(
+            [StaticPathConfig(_CARD_URL_BASE, str(frontend_dir), False)]
+        )
+        add_extra_js_url(hass, f"{_CARD_URL_BASE}/{_CARD_FILE}?v={version}")
+    except Exception:  # noqa: BLE001 - card is cosmetic; never fail the entry over it
+        _LOGGER.exception(
+            "AirWatch Lovelace card registration failed; card will not be served"
+        )
+        return
+
+    hass.data[_CARD_LOADED_KEY] = True
     _LOGGER.info("AirWatch Lovelace card registered (v%s)", version)
 
 
@@ -117,6 +131,22 @@ async def async_setup_entry(
     analytics = AirWatchAnalyticsCoordinator(hass, entry, coordinators)
     await analytics.async_refresh()
 
+    # Recompute analytics whenever a source coordinator publishes new data,
+    # rather than only on the analytics coordinator's own hourly clock — without
+    # this the consensus / divergence lag their inputs by up to an hour (a source
+    # polling every 15 min would disagree with its own raw sensor on the same
+    # dashboard). async_request_refresh is debounced, so bursts coalesce.
+    from homeassistant.core import callback
+
+    @callback
+    def _schedule_analytics_refresh() -> None:
+        entry.async_create_task(hass, analytics.async_request_refresh())
+
+    for coordinator in coordinators.values():
+        entry.async_on_unload(
+            coordinator.async_add_listener(_schedule_analytics_refresh)
+        )
+
     entry.runtime_data = AirWatchData(
         coordinators=coordinators, analytics=analytics
     )
@@ -137,6 +167,30 @@ async def async_unload_entry(
     return await hass.config_entries.async_unload_platforms(
         entry, [Platform(p) for p in PLATFORMS]
     )
+
+
+async def async_remove_config_entry_device(
+    hass: HomeAssistant,
+    config_entry: AirWatchConfigEntry,
+    device_entry: DeviceEntry,
+) -> bool:
+    """Allow deleting a device only when it no longer maps to an active source.
+
+    Disabling a source in the options flow prunes its entities but leaves its
+    per-source device stranded (zero entities) with no Delete button. Return
+    True (allow removal) for any AirWatch device whose identifier does not
+    belong to a currently-enabled source or the analytics device.
+    """
+    runtime = getattr(config_entry, "runtime_data", None)
+    active_ids: set[tuple[str, str]] = {
+        (DOMAIN, f"{config_entry.entry_id}_analytics")
+    }
+    if runtime is not None:
+        active_ids.update(
+            (DOMAIN, f"{config_entry.entry_id}_{source_key}")
+            for source_key in runtime.coordinators
+        )
+    return not (device_entry.identifiers & active_ids)
 
 
 async def _async_reload_entry(
