@@ -88,7 +88,8 @@ def _http_get_json(url: str, timeout: float) -> tuple[int, Any]:
     req = urllib.request.Request(url, headers={"User-Agent": "AirWatch/0.0.1"})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return resp.status, json.loads(resp.read().decode("utf-8"))
+            status = resp.status
+            raw = resp.read().decode("utf-8")
     except urllib.error.HTTPError as err:
         # Open-Meteo returns a JSON body (e.g. {"error": true, "reason": ...})
         # alongside 4xx codes. Surface it instead of treating it as transport
@@ -100,6 +101,12 @@ def _http_get_json(url: str, timeout: float) -> tuple[int, Any]:
             return err.code, {"error": True, "reason": raw[:200]}
     # urllib.error.URLError (a subclass of OSError) and socket timeouts
     # propagate to fetch() for retry handling.
+    # A 200 with a non-JSON body (captive portal / proxy) must be classified,
+    # not raised as a bare JSONDecodeError that escapes fetch() unhandled.
+    try:
+        return status, json.loads(raw)
+    except json.JSONDecodeError:
+        return status, {"error": True, "reason": raw[:200]}
 
 
 def _async_retryable_exceptions() -> tuple[type[BaseException], ...]:
@@ -183,7 +190,6 @@ class OpenMeteoSource:
         for attempt in range(attempts):
             try:
                 status, payload = self._transport(url, self.timeout)
-                break
             except OSError as err:  # incl. urllib.error.URLError, timeouts
                 if attempt + 1 < attempts:
                     time.sleep(self.retry_delay)
@@ -191,6 +197,12 @@ class OpenMeteoSource:
                 raise SourceUnavailable(
                     f"Open-Meteo request failed after {attempts} attempts: {err}"
                 ) from err
+            # A 5xx is transient too — retry it in-request rather than only
+            # relying on the coordinator's next scheduled poll.
+            if status >= 500 and attempt + 1 < attempts:
+                time.sleep(self.retry_delay)
+                continue
+            break
         return self._handle_response(status, payload)
 
     async def async_fetch(
@@ -229,7 +241,6 @@ class OpenMeteoSource:
         for attempt in range(attempts):
             try:
                 status, payload = await transport(url, self.timeout)
-                break
             except retryable as err:
                 if attempt + 1 < attempts:
                     await asyncio.sleep(self.retry_delay)
@@ -237,6 +248,12 @@ class OpenMeteoSource:
                 raise SourceUnavailable(
                     f"Open-Meteo request failed after {attempts} attempts: {err}"
                 ) from err
+            # A 5xx is transient too — retry it in-request rather than only
+            # relying on the coordinator's next scheduled poll.
+            if status >= 500 and attempt + 1 < attempts:
+                await asyncio.sleep(self.retry_delay)
+                continue
+            break
         return self._handle_response(status, payload)
 
     def _make_aiohttp_transport(
@@ -260,6 +277,19 @@ class OpenMeteoSource:
         return transport
 
     def _handle_response(self, status: int, payload: Any) -> SourceResult:
+        # A 5xx is a transient server-side failure (per base.py's contract),
+        # not a permanent/unrecognised response — classify it as retryable
+        # SourceUnavailable so diagnostics reflect reality and the fetch loop's
+        # in-request retry applies, rather than SourceResponseError ("usually a
+        # bug or upstream change").
+        if status >= 500:
+            reason = ""
+            if isinstance(payload, dict):
+                reason = str(payload.get("reason", "")).strip()
+            raise SourceUnavailable(
+                f"Open-Meteo transient server error (HTTP {status})"
+                + (f": {reason}" if reason else "")
+            )
         if isinstance(payload, dict) and payload.get("error"):
             reason = str(payload.get("reason", "")).strip()
             if _COVERAGE_REASON in reason.lower():

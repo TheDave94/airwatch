@@ -88,16 +88,19 @@ class DivergenceSensor(
         self._attr_device_info = analytics_device_info(entry)
 
     def _result(self):
+        if self.coordinator.data is None:
+            return None
         return self.coordinator.data.consensus.get(self._pollutant)
 
     @property
     def available(self) -> bool:
+        # Guard super().available / data-None before dereferencing _result so a
+        # failed analytics refresh (data is None) reports unavailable instead of
+        # raising AttributeError on every state write.
+        if not super().available or self.coordinator.data is None:
+            return False
         result = self._result()
-        return (
-            super().available
-            and result is not None
-            and len(result.source_levels) >= 2
-        )
+        return result is not None and len(result.source_levels) >= 2
 
     @property
     def is_on(self) -> bool | None:

@@ -129,17 +129,18 @@ async def async_setup_entry(
     analytics = runtime.analytics
     entities: list[SensorEntity] = []
     for source_key, coordinator in runtime.coordinators.items():
-        # Keep registry entries for every configured pollutant (so a transient
-        # absence doesn't delete a sensor); only create sensors for pollutants the
-        # source actually returned (a source's set is location/coverage-dependent).
         configured = set(coordinator.source.pollutants)
         _async_remove_deconfigured_entities(hass, entry, source_key, configured)
-        if coordinator.data is None:
-            continue
-        present = [
-            p for p in coordinator.source.pollutants if p in coordinator.data.pollutants
-        ]
-        for pollutant in present:
+        # Create a sensor for every pollutant this source is configured to
+        # report (its supported∩selected set), NOT only the ones present in the
+        # latest fetch. Two reasons: (1) a source whose first refresh fails or
+        # returns out-of-coverage at boot would otherwise never get any entities
+        # — and a coordinator with no entities has no listeners, so HA never
+        # schedules its polling and it can never recover without a reload;
+        # (2) the entity set must be stable across transient empty fetches.
+        # Availability gates each sensor, so an as-yet-unreported pollutant
+        # simply shows "unavailable" until data arrives.
+        for pollutant in coordinator.source.pollutants:
             entities.append(AirWatchSensor(coordinator, source_key, pollutant))
             # recent_percentile only for sources whose data may be baselined
             # (supports_history). A no-storage source would skip it cleanly.
@@ -337,17 +338,22 @@ class AirWatchSensor(CoordinatorEntity[AirWatchSourceCoordinator], SensorEntity)
     def available(self) -> bool:
         return (
             super().available
+            and self.coordinator.data is not None
             and self._pollutant in self.coordinator.data.pollutants
         )
 
     @property
     def native_value(self) -> float | None:
+        if self.coordinator.data is None:
+            return None
         series = self.coordinator.data.pollutants.get(self._pollutant)
         return series.current if series else None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
         result = self.coordinator.data
+        if result is None:
+            return None
         series = result.pollutants.get(self._pollutant)
         if series is None:
             return None
@@ -423,6 +429,8 @@ class ConsensusSensor(
         self._attr_device_info = analytics_device_info(entry)
 
     def _result(self):
+        if self.coordinator.data is None:
+            return None
         return self.coordinator.data.consensus.get(self._pollutant)
 
     @property
@@ -430,12 +438,13 @@ class ConsensusSensor(
         # Available when at least one source is currently contributing. The
         # n/m badge in attributes tells the user whether it's single-source or
         # cross-validated; the sensor's presence is no longer the gate.
+        # Guard super().available / data-None BEFORE dereferencing _result so an
+        # analytics coordinator whose refresh failed (data is None) reports
+        # unavailable instead of raising AttributeError on every state write.
+        if not super().available or self.coordinator.data is None:
+            return False
         result = self._result()
-        return (
-            super().available
-            and result is not None
-            and result.source_count >= 1
-        )
+        return result is not None and result.source_count >= 1
 
     @property
     def native_value(self) -> str | None:
@@ -491,7 +500,11 @@ class OverallConsensusSensor(
     def _result(self) -> OverallResult:
         # Exclude european_aqi (a parallel composite, not a sub-index) and pass
         # the rest in canonical order so worst_pollutant ties break stably.
-        consensus_map = self.coordinator.data.consensus
+        # Tolerate a None analytics payload (failed refresh) so `available`
+        # below never raises reducing it.
+        consensus_map = (
+            self.coordinator.data.consensus if self.coordinator.data else {}
+        )
         ordered = {
             pollutant: consensus_map[pollutant]
             for pollutant in CANONICAL_POLLUTANTS
@@ -557,6 +570,8 @@ class RecentPercentileSensor(
 
     @property
     def native_value(self) -> float | None:
+        if self.coordinator.data is None:
+            return None
         result = self.coordinator.data.percentiles.get(self._key)
         if result is None or result.status != "ok":
             return None
@@ -564,6 +579,8 @@ class RecentPercentileSensor(
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
+        if self.coordinator.data is None:
+            return None
         result = self.coordinator.data.percentiles.get(self._key)
         if result is None:
             return None

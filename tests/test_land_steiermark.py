@@ -142,6 +142,27 @@ def test_parse_discovery_groups_streams_by_station():
     assert donbosco.distance_km is not None and donbosco.distance_km < 5
 
 
+def test_parse_discovery_normalises_co_mg_to_ugm3():
+    """A CO datastream declared in mg/m³ is normalised to µg/m³ (x1000).
+
+    The registry thresholds are µg/m³; without this a live CO reading (~0.4
+    mg/m³) would be carried as 0.4 µg/m³ and always classify clean.
+    """
+    co_stream = _datastream("CO", 0.4, 1.0)
+    co_stream["unitOfMeasurement"] = {"symbol": "mg.m-3"}
+    # A µg/m³ pollutant on the same station must be left untouched.
+    pm_stream = _datastream("PM10", 22.0, 1.0)
+    pm_stream["unitOfMeasurement"] = {"symbol": "µg.m-3"}
+    stations = parse_discovery(
+        {"value": [co_stream, pm_stream]},
+        ["carbon_monoxide", "pm10"],
+        requested_lat=_SITE_LAT, requested_lon=_SITE_LON,
+    )
+    readings = stations[0].readings
+    assert readings["carbon_monoxide"][0] == 400.0  # 0.4 mg/m³ -> 400 µg/m³
+    assert readings["pm10"][0] == 22.0  # already µg/m³, unchanged
+
+
 def test_parse_discovery_ignores_unrequested_pollutant():
     payload = {"value": [_datastream("O3", 80.0, 1.0)]}
     stations = parse_discovery(

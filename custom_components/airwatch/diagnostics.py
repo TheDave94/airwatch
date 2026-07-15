@@ -13,10 +13,15 @@ from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.const import CONF_LATITUDE, CONF_LONGITUDE
 from homeassistant.core import HomeAssistant
 
+from .const import CONF_STATION, CONF_STATIONS
 from .coordinator import AirWatchConfigEntry
 from .sources.base import SourceResult
 
-TO_REDACT = {CONF_LATITUDE, CONF_LONGITUDE}
+# Station identifiers are location-equivalent: a Sensor.Community sensor id or a
+# Land Steiermark station label (which also carries the exact distance from the
+# user's coordinates) both resolve to public coordinates, undoing the lat/lon
+# redaction. Redact them alongside the coordinates.
+TO_REDACT = {CONF_LATITUDE, CONF_LONGITUDE, CONF_STATION, CONF_STATIONS}
 
 
 def _summarise_result(result: SourceResult | None) -> dict[str, Any] | None:
@@ -29,7 +34,10 @@ def _summarise_result(result: SourceResult | None) -> dict[str, Any] | None:
         "timezone": result.timezone,
         "current_time": result.current_time,
         "generated_at": result.generated_at,
-        "station": result.station,
+        # Do NOT emit result.station (station id / label + exact distance) — it
+        # re-identifies the user's location. A presence flag keeps the debugging
+        # value (was a station selected?) without the identifier.
+        "station_selected": result.station is not None,
         "coordinate_shift_km": result.coordinate_shift_km,
         "times": len(result.times),
         "pollutants": {

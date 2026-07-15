@@ -4,7 +4,8 @@
   "after_dependencies": [
     "frontend",
     "http",
-    "recorder"
+    "recorder",
+    "websocket_api"
   ],
   "codeowners": [
     "@TheDave94"

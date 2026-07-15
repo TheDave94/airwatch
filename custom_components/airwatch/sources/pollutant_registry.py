@@ -554,6 +554,13 @@ def level_for_value(pollutant: str, value: float | None) -> int | None:
     if value is None:
         return None
     if pollutant == "carbon_monoxide":
+        # NOTE: `>=` here is a deliberate, health-conservative choice — a
+        # reading exactly AT the WHO CO guideline is treated as onset/peak of
+        # the next level. This intentionally differs from the EAQI band cuts
+        # (which keep a value at the bound in the lower band) and from the
+        # WHO/EU `exceeds` provenance flag (strict `>`). Do not "harmonise" this
+        # to `>` without an explicit health-policy decision; test_pollutant_registry
+        # pins the (4000 -> 1) and (10000 -> 2) boundary behaviour.
         onset, peak = _CO_LEVEL_BOUNDS
         if value >= peak:
             return 2
@@ -599,7 +606,10 @@ def _who_entry(g: WhoGuideline, value: float) -> dict[str, Any]:
         "authority": g.authority,
         "value": g.aqg,
         "averaging": g.averaging,
-        "exceeds": value >= g.aqg,
+        # Strict >: a reading exactly AT the WHO air-quality guideline value is
+        # compliant, not an exceedance ("levels should not exceed"). This also
+        # matches the EAQI band logic, whose "fair" cut is the WHO 24-h AQG.
+        "exceeds": value > g.aqg,
     }
     if g.interim_targets:
         entry["interim_targets"] = list(g.interim_targets)
@@ -618,7 +628,9 @@ def _eu_entry(s: EuStandard, value: float) -> dict[str, Any]:
         "kind": s.kind,
         "attain_by": s.attain_by,
         "status": s.status,
-        "exceeds": value >= s.value,
+        # Strict >: an EU limit/target value "shall not be exceeded", so a
+        # reading exactly at the limit is compliant.
+        "exceeds": value > s.value,
     }
     if s.max_exceedances:
         entry["max_exceedances"] = s.max_exceedances

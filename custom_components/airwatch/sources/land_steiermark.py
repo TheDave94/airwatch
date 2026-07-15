@@ -64,6 +64,7 @@ if TYPE_CHECKING:
 
 from .base import (
     PollutantSeries,
+    SourceResponseError,
     SourceResult,
     SourceStatus,
     SourceUnavailable,
@@ -129,13 +130,20 @@ def _http_get_json(url: str, timeout: float) -> tuple[int, Any]:
     req = urllib.request.Request(url, headers={"User-Agent": "AirWatch/0.1.0"})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return resp.status, json.loads(resp.read().decode("utf-8"))
+            status = resp.status
+            raw = resp.read().decode("utf-8")
     except urllib.error.HTTPError as err:
         raw = err.read().decode("utf-8", errors="replace")
         try:
             return err.code, json.loads(raw)
         except json.JSONDecodeError:
             return err.code, {"error": True, "reason": raw[:200]}
+    # A 200 with a non-JSON body (proxy/error page) must be classified, not
+    # raised as a bare JSONDecodeError that escapes fetch() unhandled.
+    try:
+        return status, json.loads(raw)
+    except json.JSONDecodeError:
+        return status, {"error": True, "reason": raw[:200]}
 
 
 def _async_retryable_exceptions() -> tuple[type[BaseException], ...]:
@@ -210,7 +218,14 @@ def _parse_phenomenon_end(phenomenon_time: Any) -> datetime | None:
 
 
 def _latest_observation(datastream: dict) -> tuple[float, datetime] | None:
-    """Extract ``(value, phenomenon_end)`` from a datastream's latest Observation."""
+    """Extract ``(value, phenomenon_end)`` from a datastream's latest Observation.
+
+    The value is normalised to µg/m³ using the Datastream's declared
+    ``unitOfMeasurement`` — Steiermark reports CO in mg/m³ while every other
+    pollutant is µg/m³, and the pollutant registry's thresholds are µg/m³, so a
+    CO reading carried at its native mg/m³ magnitude would read 1000x too low
+    and always classify as clean.
+    """
     observations = datastream.get("Observations") or []
     if not observations or not isinstance(observations[0], dict):
         return None
@@ -219,7 +234,24 @@ def _latest_observation(datastream: dict) -> tuple[float, datetime] | None:
     end = _parse_phenomenon_end(obs.get("phenomenonTime"))
     if value is None or end is None:
         return None
-    return value, end
+    unit_symbol = (datastream.get("unitOfMeasurement") or {}).get("symbol")
+    return _to_ugm3(value, unit_symbol), end
+
+
+# FROST declares each Datastream's ``unitOfMeasurement``. Steiermark reports CO
+# in mg/m³; everything else in µg/m³. The registry thresholds are µg/m³, so we
+# normalise every concentration to µg/m³ at parse time.
+_MG_UNIT_SYMBOLS = frozenset({"mg.m-3", "mg/m³", "mg/m3", "mg m-3"})
+
+
+def _to_ugm3(value: float, unit_symbol: Any) -> float:
+    """Normalise a concentration reading to µg/m³ using its declared unit."""
+    symbol = unit_symbol.strip().lower() if isinstance(unit_symbol, str) else ""
+    if symbol in _MG_UNIT_SYMBOLS:
+        return value * 1000.0
+    # µg/m³ (recognised or, for an unrecognised/absent symbol, assumed — the
+    # registry's unit); no conversion.
+    return value
 
 
 def _point_lat_lon(location_payload: Any) -> tuple[float | None, float | None]:
@@ -390,7 +422,11 @@ def _fresh_valid_readings(
         if _valid_value(value) is None:
             continue
         age_h = (now - end).total_seconds() / 3600.0
-        if 0 <= age_h <= max_age_hours:
+        # Tolerate a small clock skew: a reading a few minutes in the future
+        # (feed clock ahead of the HA host) is still fresh, not invalid — its
+        # age is ~0. Without the lower tolerance such a reading was dropped and
+        # the failure message read a self-contradictory "~-0.0 days old".
+        if -0.25 <= age_h <= max_age_hours:
             out[pollutant] = (value, end)
     return out
 
@@ -620,7 +656,8 @@ class LandSteiermarkSource:
         params = [
             ("$filter", f"startswith(Thing/properties/localId,'{REGION_PREFIX}') and ({op})"),
             ("$expand", expand),
-            ("$select", "@iot.id"),
+            # unitOfMeasurement is needed to normalise CO (mg/m³) to µg/m³.
+            ("$select", "@iot.id,unitOfMeasurement"),
             ("$top", str(_DISCOVERY_TOP)),
         ]
         return f"{self.base_url}/Datastreams?{self._query(params)}"
@@ -720,21 +757,47 @@ class LandSteiermarkSource:
 
     # -- transports ----------------------------------------------------------
 
+    def _classify_payload(self, status: int, payload: Any) -> Any:
+        """Turn a (status, body) pair into a payload or a typed error.
+
+        Without this the HTTP status was discarded, so a 5xx or an HTML error
+        body (e.g. the documented DataCove outage) was parsed as "no stations"
+        and reported as OUT_OF_COVERAGE — a misleading coverage message for a
+        transient transport failure, and no retryable classification.
+        """
+        if status >= 500:
+            raise SourceUnavailable(
+                f"Land Steiermark transient server error (HTTP {status})."
+            )
+        if status != 200:
+            raise SourceResponseError(
+                f"Land Steiermark returned unexpected HTTP {status}."
+            )
+        if isinstance(payload, dict) and payload.get("error"):
+            reason = str(payload.get("reason", "")).strip()
+            raise SourceResponseError(
+                f"Land Steiermark error: {reason or 'unparseable response body'}"
+            )
+        return payload
+
     def _get_sync(self, url: str) -> Any:
+        import time
+
         attempts = 2
         for attempt in range(attempts):
             try:
-                _status, payload = self._transport(url, self.timeout)
-                return payload
+                status, payload = self._transport(url, self.timeout)
             except OSError as err:
                 if attempt + 1 < attempts:
-                    import time
-
                     time.sleep(self.retry_delay)
                     continue
                 raise SourceUnavailable(
                     f"Land Steiermark request failed after {attempts} attempts: {err}"
                 ) from err
+            if status >= 500 and attempt + 1 < attempts:
+                time.sleep(self.retry_delay)
+                continue
+            return self._classify_payload(status, payload)
         return None
 
     async def _get_async(self, transport: AsyncTransport, url: str) -> Any:
@@ -742,8 +805,7 @@ class LandSteiermarkSource:
         attempts = 2
         for attempt in range(attempts):
             try:
-                _status, payload = await transport(url, self.timeout)
-                return payload
+                status, payload = await transport(url, self.timeout)
             except retryable as err:
                 if attempt + 1 < attempts:
                     await asyncio.sleep(self.retry_delay)
@@ -751,6 +813,10 @@ class LandSteiermarkSource:
                 raise SourceUnavailable(
                     f"Land Steiermark request failed after {attempts} attempts: {err}"
                 ) from err
+            if status >= 500 and attempt + 1 < attempts:
+                await asyncio.sleep(self.retry_delay)
+                continue
+            return self._classify_payload(status, payload)
         return None
 
     def _make_aiohttp_transport(

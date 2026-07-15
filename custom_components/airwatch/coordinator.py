@@ -57,7 +57,13 @@ from .const import (
     SOURCE_OPEN_METEO,
     SOURCE_SENSOR_COMMUNITY,
 )
-from .sources.base import AirQualitySource, PollutantSeries, SourceError, SourceResult
+from .sources.base import (
+    AirQualitySource,
+    PollutantSeries,
+    SourceError,
+    SourceResult,
+    SourceStatus,
+)
 from .sources.open_meteo import OpenMeteoSource
 from .sources.pollutant_registry import CANONICAL_POLLUTANTS
 
@@ -112,8 +118,23 @@ class AirWatchSourceCoordinator(DataUpdateCoordinator[SourceResult]):
         except SourceError as err:
             raise UpdateFailed(str(err)) from err
         if not result.ok:
-            # The location is coverage-checked at setup; a non-OK result now
-            # means a transient upstream issue rather than a misconfiguration.
+            # Land Steiermark is an opt-in daily-mean "drift anchor" whose feed
+            # routinely lags days behind the freshness window; an
+            # out-of-coverage answer is its normal "no current data" state, not
+            # a transient failure. Return the empty result so this coordinator
+            # stays successful-but-empty (its sensors simply show unavailable)
+            # instead of raising UpdateFailed on every poll — which otherwise
+            # spams the log on the success→failure transition, marks the source
+            # permanently failed, and (because entity creation used to be gated
+            # on live data) meant its sensors were never created at all.
+            if (
+                self.source_key == SOURCE_LAND_STEIERMARK
+                and result.status is SourceStatus.OUT_OF_COVERAGE
+            ):
+                return result
+            # Other sources: a non-OK result means a transient upstream issue
+            # rather than a misconfiguration (the location is coverage-checked
+            # at setup).
             raise UpdateFailed(
                 result.message
                 or f"{self.source_key} returned no usable air-quality data."
@@ -261,6 +282,14 @@ class AirWatchAnalyticsCoordinator(DataUpdateCoordinator[AnalyticsData]):
             data = coordinator.data
             if data is None:
                 continue
+            if _is_source_stale(coordinator):
+                # A failed source keeps its last SourceResult in
+                # ``coordinator.data`` (HA retains data across failed
+                # refreshes). Its raw sensor is already unavailable; the
+                # analytics layer must also stop counting it once the cached
+                # reading has aged out, or a source dead for days silently
+                # inflates source_count and pins the consensus at its last value.
+                continue
             source = coordinator.source
             # Self-baselining sources rank their own latest day (observation
             # feeds may lag, so the calendar today may be absent).
@@ -293,8 +322,19 @@ class AirWatchAnalyticsCoordinator(DataUpdateCoordinator[AnalyticsData]):
     async def _recorder_percentile(
         self, source_key: str, pollutant: str, today: str
     ) -> PercentileResult:
-        """recent_percentile from HA recorder history of a source's raw sensor."""
-        entity_id = f"sensor.{DOMAIN}_{source_key}_{pollutant}"
+        """recent_percentile from HA recorder history of a source's raw sensor.
+
+        Resolves the raw sensor's entity_id from the registry by its unique_id
+        rather than reconstructing the slug, so a user-renamed entity_id still
+        finds its history. Falls back to the canonical slug when unresolved
+        (e.g. before the entity is registered).
+        """
+        from homeassistant.helpers import entity_registry as er
+
+        unique_id = f"{self.config_entry.entry_id}_{source_key}_{pollutant}"
+        entity_id = er.async_get(self.hass).async_get_entity_id(
+            "sensor", DOMAIN, unique_id
+        ) or f"sensor.{DOMAIN}_{source_key}_{pollutant}"
         peaks = await self._recorder_daily_peaks(entity_id)
         return compute_recent_percentile(peaks[-PERCENTILE_WINDOW_DAYS:], today)
 
@@ -345,12 +385,16 @@ def analytics_device_info(entry: AirWatchConfigEntry) -> DeviceInfo:
 def multi_source_pollutants(
     coordinators: dict[str, AirWatchSourceCoordinator],
 ) -> list[str]:
-    """Pollutants currently covered by >= 2 sources (divergence needs two)."""
+    """Pollutants covered by >= 2 enabled sources (divergence needs two).
+
+    Declaration-based (each source's configured pollutant set), NOT data-based:
+    the set of entities a config produces must be stable and must not vanish
+    when a source's latest fetch is briefly empty, stale, or failed. Coverage
+    is a property of which sources are enabled, not of the last poll.
+    """
     counts: dict[str, int] = {}
     for coordinator in coordinators.values():
-        if coordinator.data is None:
-            continue
-        for pollutant in coordinator.data.pollutants:
+        for pollutant in coordinator.source.pollutants:
             counts[pollutant] = counts.get(pollutant, 0) + 1
     return sorted(pollutant for pollutant, n in counts.items() if n >= 2)
 
@@ -358,17 +402,41 @@ def multi_source_pollutants(
 def all_covered_pollutants(
     coordinators: dict[str, AirWatchSourceCoordinator],
 ) -> list[str]:
-    """Pollutants currently covered by >= 1 source.
+    """Pollutants covered by >= 1 enabled source (declaration-based).
 
     Single-source pollutants still get a consensus sensor (pass-through level +
-    n/m badge); the badge tells users the reading is single-source.
+    n/m badge); the badge tells users the reading is single-source. Uses each
+    source's configured pollutant set (see :func:`multi_source_pollutants` for
+    why this is declaration-based rather than data-based).
     """
     covered: set[str] = set()
     for coordinator in coordinators.values():
-        if coordinator.data is None:
-            continue
-        covered.update(coordinator.data.pollutants.keys())
+        covered.update(coordinator.source.pollutants)
     return sorted(covered)
+
+
+# A failed source keeps its last SourceResult in ``coordinator.data`` (HA's
+# DataUpdateCoordinator retains data across failed refreshes). The analytics
+# layer stops counting such a source once its cached reading has aged past this
+# many of the source's own update intervals. A short transient blip (data still
+# recent) is tolerated so the consensus does not flap on a single missed poll.
+_SOURCE_STALE_INTERVALS = 3
+
+
+def _is_source_stale(coordinator: AirWatchSourceCoordinator) -> bool:
+    """True when a source's cached data failed to refresh AND has aged out."""
+    if coordinator.last_update_success:
+        return False  # just refreshed — the cached data is fresh by definition
+    data = coordinator.data
+    if data is None or not data.generated_at:
+        return True  # failed with no usable timestamp → treat as stale
+    generated = dt_util.parse_datetime(data.generated_at)
+    if generated is None:
+        return True
+    if generated.tzinfo is None:
+        generated = generated.replace(tzinfo=dt_util.UTC)
+    interval = coordinator.update_interval or timedelta(hours=1)
+    return dt_util.now() - generated > interval * _SOURCE_STALE_INTERVALS
 
 
 def _registry_max_possible(pollutant: str) -> int:
