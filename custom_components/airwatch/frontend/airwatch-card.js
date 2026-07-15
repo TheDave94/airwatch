@@ -143,13 +143,20 @@
   const ICON_CACHE = new Map();
   async function loadGlyph(key) {
     if (ICON_CACHE.has(key)) return ICON_CACHE.get(key);
-    try {
+    // Cache the in-flight promise (dedupes concurrent row renders). Only
+    // SUCCESS stays cached — a transient failure (offline blip, HA restart)
+    // evicts the entry so the next render retries instead of blanking the
+    // glyph for the rest of the session.
+    const pending = (async () => {
       const r = await fetch(ICON_URL(key));
-      const svg = r.ok ? await r.text() : null;
-      ICON_CACHE.set(key, svg);
-      return svg;
+      if (!r.ok) throw new Error(`glyph ${key}: HTTP ${r.status}`);
+      return r.text();
+    })();
+    ICON_CACHE.set(key, pending);
+    try {
+      return await pending;
     } catch (_e) {
-      ICON_CACHE.set(key, null);
+      if (ICON_CACHE.get(key) === pending) ICON_CACHE.delete(key);
       return null;
     }
   }
@@ -211,6 +218,20 @@
     return String(Math.round(n * 10) / 10);
   }
 
+  // Entity-attribute colour strings are interpolated into style="…"
+  // attributes, so they MUST be validated — a crafted attribute value could
+  // otherwise break out of the attribute and inject markup (XSS). Every
+  // legitimate palette colour is a 6-digit hex (which also keeps the
+  // `${colour}33` 8-digit-alpha suffix valid); anything else falls back to
+  // the client-side palette.
+  const SAFE_HEX = /^#[0-9a-fA-F]{6}$/;
+  const safeColour = (c, fallback) =>
+    (typeof c === 'string' && SAFE_HEX.test(c) ? c : fallback);
+  // Band indexes drive EAQI_PALETTE lookups and the gauge geometry — anything
+  // outside integer 1..6 is treated as unknown (awGauge would otherwise throw
+  // on EAQI_PALETTE[band].colour and abort the whole render).
+  const eaqiBand = (i) => (Number.isInteger(i) && i >= 1 && i <= 6 ? i : null);
+
   //   returns { colour, label, band, basis } | null
   function severityFor(pollutant, ent) {
     const bands = ent?.attributes?.bands || {};
@@ -223,18 +244,20 @@
     if (pollutant === 'european_aqi') {
       const c = bands.eaqi_classic;
       if (!c) return null;
+      const band = eaqiBand(c.band_index);
       return {
-        colour: c.colour || EAQI_PALETTE[c.band_index]?.colour || UNKNOWN_COLOUR,
-        label: bandLabel(c.band) || EAQI_PALETTE[c.band_index]?.label,
-        basis: 'classic index', band: c.band_index,
+        colour: safeColour(c.colour, band ? EAQI_PALETTE[band].colour : UNKNOWN_COLOUR),
+        label: bandLabel(c.band) || (band ? EAQI_PALETTE[band].label : null),
+        basis: 'classic index', band,
       };
     }
     const r = bands.eaqi_eea_2024;
     if (!r) return null;
+    const band = eaqiBand(r.band_index);
     return {
-      colour: r.colour || EAQI_PALETTE[r.band_index]?.colour || UNKNOWN_COLOUR,
-      label: bandLabel(r.band) || EAQI_PALETTE[r.band_index]?.label,
-      basis: 'revised EEA', band: r.band_index,
+      colour: safeColour(r.colour, band ? EAQI_PALETTE[band].colour : UNKNOWN_COLOUR),
+      label: bandLabel(r.band) || (band ? EAQI_PALETTE[band].label : null),
+      basis: 'revised EEA', band,
     };
   }
 
@@ -283,6 +306,11 @@
 
   function consensusView(hass, pollutant, consensusEnt) {
     if (!consensusEnt) return null;
+    // Analytics being down must not masquerade as a "Single source — not yet
+    // cross-validated (0/0)" verdict: no consensus block at all in that case.
+    if (consensusEnt.state === 'unavailable' || consensusEnt.state === 'unknown') {
+      return null;
+    }
     const a = consensusEnt.attributes || {};
     const levels = a.source_levels || {};
     const count = a.source_count ?? Object.keys(levels).length;
@@ -560,9 +588,13 @@
       if (!config || typeof config !== 'object') {
         throw new Error('airwatch-card: config object required');
       }
-      const explicit = Array.isArray(config.pollutants)
+      // Blank (undefined, [] or '') means "all configured" — only a non-empty
+      // selection is treated as explicit (same guard the sources filter uses).
+      const explicit = Array.isArray(config.pollutants) && config.pollutants.length
         ? config.pollutants.slice()
-        : (typeof config.pollutants === 'string' ? [config.pollutants] : null);
+        : (typeof config.pollutants === 'string' && config.pollutants
+          ? [config.pollutants]
+          : null);
       const sources = Array.isArray(config.sources) && config.sources.length
         ? new Set(config.sources)
         : null;
@@ -580,13 +612,23 @@
       this._built = false;
       if (this._config.brand_font) ensureFonts();
       this._build();
+      // Reconfiguring resets discovery state above, but discovery is only
+      // ever kicked off by the FIRST hass assignment — on a live card,
+      // re-kick it here or the card falls back to per-render scanning
+      // forever.
+      if (this._hass) this._ensureDiscovery();
     }
 
     set hass(hass) {
-      const first = !this._hass;
+      const oldHass = this._hass;
       this._hass = hass;
-      if (first) this._ensureDiscovery();
-      if (this._built) this._render();
+      if (!oldHass) this._ensureDiscovery();
+      if (!this._built) return;
+      // Relevance gate: HA assigns hass on EVERY state change anywhere in
+      // the system (hundreds/min). Only re-render when a state object this
+      // card actually reads changed identity.
+      if (oldHass && !this._relevantChanged(oldHass, hass)) return;
+      this._render();
     }
 
     getCardSize() {
@@ -641,6 +683,44 @@
         }
       }
       return out;
+    }
+
+    // Entity ids the card reads for a pollutant-key list, cached against a
+    // signature of the keys. ALL sources are watched regardless of the
+    // `sources` filter, because the consensus detail lists every reporting
+    // source even when the headline reading is filtered.
+    _watchedIdsFor(keys) {
+      const sig = keys.slice().sort().join('|');
+      if (this._watchedSig !== sig) {
+        const ids = [];
+        for (const k of keys) {
+          for (const src of SOURCE_PRIORITY) ids.push(`sensor.${DOMAIN}_${src}_${k}`);
+          ids.push(`sensor.${DOMAIN}_analytics_${k}_consensus`);
+          ids.push(`binary_sensor.${DOMAIN}_analytics_${k}_divergence`);
+        }
+        this._watchedSig = sig;
+        this._watchedIds = ids;
+      }
+      return this._watchedIds;
+    }
+
+    _relevantChanged(oldHass, hass) {
+      const resolved = this._config?._explicitPollutants || this._discoveredPollutants;
+      let keys;
+      if (resolved) {
+        keys = resolved;
+      } else {
+        // Discovery unresolved → the row set itself comes from scanning
+        // hass.states, so re-derive the key set from the NEW hass on every
+        // assignment; a consensus entity appearing (or vanishing) changes
+        // the rendered structure and must not be gated out.
+        keys = this._scanPollutants();
+        if (keys.slice().sort().join('|') !== this._renderedKeysSig) return true;
+      }
+      for (const id of this._watchedIdsFor(keys)) {
+        if (oldHass.states[id] !== hass.states[id]) return true;
+      }
+      return false;
     }
 
     async _ensureDiscovery() {
@@ -727,6 +807,10 @@
     _render() {
       if (!this._hass || !this._built) return;
       const keys = this._resolvePollutantKeys();
+      // Signature of the key set actually rendered — while discovery is
+      // unresolved, the set-hass relevance gate compares a fresh scan
+      // against this to catch pollutant rows appearing or vanishing.
+      this._renderedKeysSig = keys.slice().sort().join('|');
       const rowsEl = this.shadowRoot.querySelector('[data-rows]');
       const heroEl = this.shadowRoot.querySelector('[data-hero]');
       const badgeEl = this.shadowRoot.querySelector('[data-badge]');
