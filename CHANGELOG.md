@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/TheDave94/airwatch/compare/v1.1.0...v1.1.1) (2026-07-15)
+
+
+### Bug Fixes
+
+* full-codebase review — correctness, security, privacy & lifecycle fixes ([#8](https://github.com/TheDave94/airwatch/issues/8)) ([0410f3b](https://github.com/TheDave94/airwatch/commit/0410f3b8cb5270640950a9cab7d3560604b2cdd0))
+
 ## [1.1.0](https://github.com/TheDave94/airwatch/compare/v1.0.3...v1.1.0) (2026-06-20)
 
 
