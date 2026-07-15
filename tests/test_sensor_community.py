@@ -145,7 +145,10 @@ def test_aggregate_means_over_valid_stations():
     assert result.pollutants["pm2_5"].current == 5.0   # (4+6)/2
     assert result.pollutants["pm10"].current == 9.0     # (8+10)/2
     assert result.pollutants["pm2_5"].native == "2 station(s)"
-    assert "1" in result.station and "2" in result.station
+    # Assert the exact station-id set, not a substring: "1"/"2" would otherwise
+    # be satisfied by the "2 station(s)" count regardless of which ids merged.
+    assert result.station.startswith("mean of 2 station(s): ")
+    assert set(result.station.split(": ", 1)[1].split(", ")) == {"1", "2"}
 
 
 def test_aggregate_one_bad_station_degrades_to_rest():
@@ -255,4 +258,6 @@ def test_source_discovery_picks_nearest_in_range():
     assert result.status is SourceStatus.OK
     # sensor 3 is out of range; 1 and 2 average: (5+6)/2 = 5.5
     assert result.pollutants["pm2_5"].current == 5.5
-    assert "1" in result.station and "2" in result.station and "3" not in result.station
+    # Exact id set (excludes the out-of-range sensor 3), not a substring match.
+    assert result.station.startswith("mean of 2 station(s): ")
+    assert set(result.station.split(": ", 1)[1].split(", ")) == {"1", "2"}

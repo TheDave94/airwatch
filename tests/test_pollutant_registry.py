@@ -208,6 +208,26 @@ def test_who_no_guideline_for_index():
     assert who_guidelines_for("european_aqi") == ()
 
 
+def test_exceeds_is_strict_at_the_guideline_value():
+    """A reading exactly at the WHO AQG is compliant, not an exceedance."""
+    # pm2_5's WHO 24-h AQG is 15 µg/m³; at exactly 15 -> not exceeded.
+    at_limit = band_provenance("pm2_5", 15.0)
+    who = [b for b in at_limit.values() if isinstance(b, list)]
+    who_entries = [e for group in who for e in group if "value" in e]
+    at_15 = [e for e in who_entries if e.get("value") == 15]
+    assert at_15 and all(e["exceeds"] is False for e in at_15)
+    # One unit above the guideline -> exceeded.
+    above = band_provenance("pm2_5", 16.0)
+    above_entries = [
+        e
+        for group in above.values()
+        if isinstance(group, list)
+        for e in group
+        if e.get("value") == 15
+    ]
+    assert above_entries and all(e["exceeds"] is True for e in above_entries)
+
+
 # === EU standards — both milestones + repealed, locked to THRESHOLDS §4 =====
 
 

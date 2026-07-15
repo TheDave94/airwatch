@@ -53,6 +53,8 @@ if TYPE_CHECKING:
 
 from .base import (
     PollutantSeries,
+    SourceError,
+    SourceResponseError,
     SourceResult,
     SourceStatus,
     SourceUnavailable,
@@ -92,13 +94,20 @@ def _http_get_json(url: str, timeout: float) -> tuple[int, Any]:
     req = urllib.request.Request(url, headers={"User-Agent": "AirWatch/0.0.1"})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return resp.status, json.loads(resp.read().decode("utf-8"))
+            status = resp.status
+            raw = resp.read().decode("utf-8")
     except urllib.error.HTTPError as err:
         raw = err.read().decode("utf-8", errors="replace")
         try:
             return err.code, json.loads(raw)
         except json.JSONDecodeError:
             return err.code, {"error": True, "reason": raw[:200]}
+    # A 200 with a non-JSON body (captive portal / proxy) must be classified,
+    # not raised as a bare JSONDecodeError that escapes fetch() unhandled.
+    try:
+        return status, json.loads(raw)
+    except json.JSONDecodeError:
+        return status, {"error": True, "reason": raw[:200]}
 
 
 def _async_retryable_exceptions() -> tuple[type[BaseException], ...]:
@@ -161,7 +170,11 @@ def _reading_fresh(timestamp: str | None, now: datetime, max_age_min: int) -> bo
         ts = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
     except ValueError:
         return False
-    return timedelta(0) <= (now - ts) <= timedelta(minutes=max_age_min)
+    # Tolerate a small clock skew: a reading whose timestamp is a little in the
+    # future (station/backend clock ahead of the HA host) is still fresh, not a
+    # stale/invalid one — treat its age as ~0 rather than dropping the station.
+    age = now - ts
+    return -timedelta(minutes=5) <= age <= timedelta(minutes=max_age_min)
 
 
 def parse_station(
@@ -406,9 +419,22 @@ class SensorCommunitySource:
     def _collect_sync(self) -> dict[int, list[dict]]:
         if self.stations:
             out: dict[int, list[dict]] = {}
+            failures = 0
             for sid in self.stations:
-                payload = self._get_sync(self._sensor_url(sid))
+                # One station's failure must not abort the others (mirror the
+                # async gather(return_exceptions=True) path); only raise when
+                # every configured station failed.
+                try:
+                    payload = self._get_sync(self._sensor_url(sid))
+                except SourceError:
+                    failures += 1
+                    out[sid] = []
+                    continue
                 out[sid] = payload if isinstance(payload, list) else []
+            if failures == len(self.stations):
+                raise SourceUnavailable(
+                    f"All {failures} Sensor.Community station requests failed."
+                )
             return out
         payload = self._get_sync(self._area_url())
         return self._select_discovered(payload if isinstance(payload, list) else [])
@@ -492,21 +518,45 @@ class SensorCommunitySource:
 
     # -- transports ----------------------------------------------------------
 
+    def _classify_payload(self, status: int, payload: Any) -> Any:
+        """Turn a (status, body) pair into a payload or a typed error.
+
+        Without this, a 5xx or an HTML error body was silently coerced to "no
+        stations" (→ OUT_OF_COVERAGE) instead of a retryable transport failure.
+        """
+        if status >= 500:
+            raise SourceUnavailable(
+                f"Sensor.Community transient server error (HTTP {status})."
+            )
+        if status != 200:
+            raise SourceResponseError(
+                f"Sensor.Community returned unexpected HTTP {status}."
+            )
+        if isinstance(payload, dict) and payload.get("error"):
+            reason = str(payload.get("reason", "")).strip()
+            raise SourceResponseError(
+                f"Sensor.Community error: {reason or 'unparseable response body'}"
+            )
+        return payload
+
     def _get_sync(self, url: str) -> Any:
+        import time
+
         attempts = 2
         for attempt in range(attempts):
             try:
-                _status, payload = self._transport(url, self.timeout)
-                return payload
+                status, payload = self._transport(url, self.timeout)
             except OSError as err:
                 if attempt + 1 < attempts:
-                    import time
-
                     time.sleep(self.retry_delay)
                     continue
                 raise SourceUnavailable(
                     f"Sensor.Community request failed after {attempts} attempts: {err}"
                 ) from err
+            if status >= 500 and attempt + 1 < attempts:
+                time.sleep(self.retry_delay)
+                continue
+            return self._classify_payload(status, payload)
         return None
 
     async def _get_async(self, transport: AsyncTransport, url: str) -> Any:
@@ -514,8 +564,7 @@ class SensorCommunitySource:
         attempts = 2
         for attempt in range(attempts):
             try:
-                _status, payload = await transport(url, self.timeout)
-                return payload
+                status, payload = await transport(url, self.timeout)
             except retryable as err:
                 if attempt + 1 < attempts:
                     await asyncio.sleep(self.retry_delay)
@@ -523,6 +572,10 @@ class SensorCommunitySource:
                 raise SourceUnavailable(
                     f"Sensor.Community request failed after {attempts} attempts: {err}"
                 ) from err
+            if status >= 500 and attempt + 1 < attempts:
+                await asyncio.sleep(self.retry_delay)
+                continue
+            return self._classify_payload(status, payload)
         return None
 
     def _make_aiohttp_transport(
