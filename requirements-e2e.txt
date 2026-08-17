@@ -1,5 +1,5 @@
 # Tier 1 prerelease gate — minimal deps for the e2e discovery smoke suite.
 # Pinned so the self-hosted runner is reproducible. Mirrors cleanroom's
 # websockets pin to avoid version drift between the two harnesses.
-pytest==8.3.4
+pytest==9.0.3
 websockets==13.1
