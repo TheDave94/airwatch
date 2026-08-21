@@ -30,6 +30,9 @@ on:
         required: false
         default: 'manual smoke check'
 
+permissions:
+  contents: read
+
 jobs:
   discovery-gate:
     name: Tier 1 — real-HA discovery smoke test

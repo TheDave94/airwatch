@@ -26,6 +26,10 @@ on:
         required: false
         default: ''
 
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
   cleanroom-pretag:
     name: cleanroom-pretag (baseline → HEAD, Gates A–D)

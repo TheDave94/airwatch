@@ -645,7 +645,7 @@ def _main(argv: list[str] | None = None) -> int:
     if stations:
         print(f"GET per-station: {[source._sensor_url(int(s)) for s in stations]}\n")
     else:
-        print(f"GET {source._area_url()}\n")
+        print("GET area endpoint\n")
     result = source.fetch()
     print(_summarise(result))
     return 0
